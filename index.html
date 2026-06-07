@@ -227,9 +227,9 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 <div id="loginPage" class="login-page hide">
   <div class="login-card">
     <h1>🏗️ OGD 项目协作</h1>
-    <p>使用密码登录（超级管理员）</p>
+    <p>使用密码登录</p>
     <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email"><input type="password" id="loginPassword" placeholder="密码" style="margin-top:8px">
-    <button id="loginBtn" onclick="loginWithPassword()">登录</button><button class="tb-ghost" id="toggleLoginBtn" onclick="toggleLoginMode()" style="margin-top:4px;width:100%;font-size:12px">使用邮箱链接登录</button>
+    <button id="loginBtn" onclick="loginWithPassword()">登录</button>
     <div id="loginMsg" class="login-msg"></div>
   </div>
 </div>
@@ -307,7 +307,7 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
       <div><label>团队</label><select id="mCompany"><option value="ECS">ECS</option><option value="嘉顿">嘉顿</option></select></div>
     </div>
     <label>角色</label><select id="mRole"><option value="member">成员</option><option value="admin">团队管理员</option></select>
-    <p style="font-size:12px;color:#999;margin-bottom:10px">添加后系统会向该邮箱发送登录链接</p>
+    <p style="font-size:12px;color:#999;margin-bottom:10px">添加后系统会向该邮箱发送确认邮件，用户需设置密码后登录</p>
     <div class="modal-btns"><button class="btn-cancel" onclick="closeMemberModal()">取消</button><button class="btn-ok" onclick="inviteMember()">发送邀请</button></div>
   </div>
 </div>
@@ -422,28 +422,7 @@ function initResizeHandles() {
 
 // ============================================================
 // AUTH
-// ============================================================
-/* Password login support */
-let loginMode = 'password';
 
-function toggleLoginMode() {
-  const pw = document.getElementById('loginPassword');
-  const btn = document.getElementById('toggleLoginBtn');
-  const mainBtn = document.getElementById('loginBtn');
-  if (loginMode === 'password') {
-    loginMode = 'magic';
-    pw.classList.add('hide');
-    mainBtn.textContent = '发送登录链接';
-    mainBtn.onclick = sendMagicLink;
-    btn.textContent = '使用密码登录';
-  } else {
-    loginMode = 'password';
-    pw.classList.remove('hide');
-    mainBtn.textContent = '登录';
-    mainBtn.onclick = loginWithPassword;
-    btn.textContent = '使用邮箱链接登录';
-  }
-}
 
 async function loginWithPassword() {
   const email = document.getElementById('loginEmail').value.trim();
@@ -459,21 +438,7 @@ async function loginWithPassword() {
   }
 }
 
-async function sendMagicLink() {
-  const email = document.getElementById('loginEmail').value.trim();
-  if (!email) return showLoginMsg('请输入邮箱','error');
-  document.getElementById('loginBtn').disabled = true;
-  document.getElementById('loginBtn').textContent = '发送中...';
-  try {
-    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
-    if (error) throw error;
-    showLoginMsg('✅ 登录链接已发送，请检查邮箱 (可能需1-2分钟)','success');
-  } catch(e) {
-    showLoginMsg('❌ ' + e.message,'error');
-  }
-  document.getElementById('loginBtn').disabled = false;
-  document.getElementById('loginBtn').textContent = '发送登录链接';
-}
+
 
 function showLoginMsg(msg, type) {
   const el = document.getElementById('loginMsg');
@@ -1026,7 +991,7 @@ async function inviteMember() {
       // New user - create profile with pending status
       await ensureProfile(data.user.id, true);
       await logAction('邀请成员', `${name} (${email}) 已邀请，团队:${company}，角色:${role}`);
-      showToast(`📧 邀请已发送至 ${email}，待用户确认`,'info');
+      showToast(`📧 邀请已发送至 ${email}，初始密码: ${tempPw}（请告知用户并提醒修改密码）`,'info');
     }
     
     document.getElementById('inviteEmail').value='';
@@ -1129,7 +1094,7 @@ document.addEventListener('keydown',e=>{
 
 document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 document.getElementById('memberModal').addEventListener('click',function(e){if(e.target===this)closeMemberModal();});
-document.getElementById('loginEmail').addEventListener('keydown',function(e){if(e.key==='Enter'){if(document.getElementById('loginPassword').value){loginWithPassword()}else{sendMagicLink()}}});
+document.getElementById('loginEmail').addEventListener('keydown',function(e){if(e.key==='Enter'){if(document.getElementById('loginPassword').value){loginWithPassword()}}});
 
 // ============================================================
 // INIT
