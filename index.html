@@ -1057,20 +1057,18 @@ async function init() {
   }
   
   // Listen for auth state changes
-  sb.auth.onAuthStateChange(async (event, session) => {
+  sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session) {
-      // Check user status before allowing access
-      const { data: profile } = await sb.from('profiles').select('status').eq('id', session.user.id).single();
-      if (profile?.status === 'disabled') {
-        await sb.auth.signOut();
-        showToast('⛔ 该账号已被禁用，请联系管理员','error');
-        return;
-      }
-      // If user just confirmed email, update status to active
-      if (profile?.status === 'pending') {
-        await sb.from('profiles').update({status: 'active'}).eq('id', session.user.id);
-      }
       loadProfile(session.user);
+      // Also check status in background (non-blocking)
+      sb.from('profiles').select('status').eq('id', session.user.id).single().then(({data: prof}) => {
+        if (prof?.status === 'disabled') {
+          sb.auth.signOut();
+          showToast('⛔ 该账号已被禁用，请联系管理员','error');
+        } else if (prof?.status === 'pending') {
+          sb.from('profiles').update({status: 'active'}).eq('id', session.user.id);
+        }
+      }).catch(() => {});
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
       document.getElementById('loginPage').classList.remove('hide');
