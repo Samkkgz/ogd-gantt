@@ -92,38 +92,22 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 .date-header th{background:#e6f0ff;padding:4px 2px;font-size:11px;color:#333;border-bottom:2px solid #91d5ff}
 .date-header+tr th{top:30px}
 
-/* === FROZEN COLUMNS (horizontal) - Table level === */
+/* === FROZEN COLUMNS — class-based, left offsets set by JS dynamic applyColStyles() === */
 .frozen-cols td{position:sticky;z-index:10}
-.frozen-cols td:first-child{left:0;z-index:11}
-.frozen-cols td:nth-child(2){left:65px}
-.frozen-cols td:nth-child(3){left:160px}
-.frozen-cols td:nth-child(4){left:325px}
-.frozen-cols td:nth-child(5){left:375px}
-.frozen-cols td:nth-child(6){left:455px}
-.frozen-cols td:nth-child(7){left:505px}
-.frozen-cols td:nth-child(8){left:540px}
 .frozen-cols th{position:sticky;top:0;z-index:30}
-.frozen-cols th:first-child{left:0;z-index:31}
-.frozen-cols th:nth-child(2){left:65px;z-index:31}
-.frozen-cols th:nth-child(3){left:160px;z-index:31}
-.frozen-cols th:nth-child(4){left:325px;z-index:31}
-.frozen-cols th:nth-child(5){left:375px;z-index:31}
-.frozen-cols th:nth-child(6){left:455px;z-index:31}
-.frozen-cols th:nth-child(7){left:505px;z-index:31}
-.frozen-cols th:nth-child(8){left:540px;z-index:31;border-right:2px solid #91d5ff}
 
-/* Separator after frozen columns */
-.gantt-wrapper td:nth-child(8){border-right:2px solid #91d5ff}
-.gantt-wrapper th:nth-child(8){border-right:2px solid #91d5ff}
+/* Separator after last frozen column */
+.gantt-wrapper td.sep-col{border-right:2px solid #91d5ff}
+.gantt-wrapper th.sep-col{border-right:2px solid #91d5ff}
 
-/* === ROW COLORS === */
+/* === ROW COLORS — phase-based row tinting === */
 tr.phase-prep td{background:#f6ffed}
 tr.phase-launch td{background:#fff7e6}
 tr.phase-exec td{background:#e6f7ff}
 tr.phase-review td{background:#f9f0ff}
 tr.phase-milestone td{background:#fff0f6}
 
-/* === FROZEN CELL BACKGROUNDS (must be explicit for sticky to show) === */
+/* === FROZEN CELL BACKGROUNDS — explicit for position:sticky to render === */
 .phase-label{font-weight:700;writing-mode:vertical-lr;letter-spacing:4px;font-size:13px;text-align:center;padding:8px 4px;min-height:60px}
 tr.phase-prep td.phase-label{background:#d9f7be;color:#237804}
 tr.phase-launch td.phase-label{background:#ffe58f;color:#ad6800}
@@ -131,21 +115,22 @@ tr.phase-exec td.phase-label{background:#91d5ff;color:#003a8c}
 tr.phase-review td.phase-label{background:#d3adf7;color:#391063}
 tr.phase-milestone td.phase-label{background:#ffadd2;color:#eb2f96}
 
-/* All frozen cell types get explicit backgrounds */
-tr.phase-prep td.cell,tr.phase-prep td.del-cell,tr.phase-prep td.ms-cell,tr.phase-prep td:nth-child(6),tr.phase-prep td:nth-child(8){background:#f6ffed}
-tr.phase-launch td.cell,tr.phase-launch td.del-cell,tr.phase-launch td.ms-cell,tr.phase-launch td:nth-child(6),tr.phase-launch td:nth-child(8){background:#fff7e6}
-tr.phase-exec td.cell,tr.phase-exec td.del-cell,tr.phase-exec td.ms-cell,tr.phase-exec td:nth-child(6),tr.phase-exec td:nth-child(8){background:#e6f7ff}
-tr.phase-review td.cell,tr.phase-review td.del-cell,tr.phase-review td.ms-cell,tr.phase-review td:nth-child(6),tr.phase-review td:nth-child(8){background:#f9f0ff}
-tr.phase-milestone td.cell,tr.phase-milestone td.del-cell,tr.phase-milestone td.ms-cell,tr.phase-milestone td:nth-child(6),tr.phase-milestone td:nth-child(8){background:#fff0f6}
+/* Generic frozen cell explicit backgrounds */
+tr.phase-prep td.cell,tr.phase-prep td.del-cell,tr.phase-prep td.ms-cell,tr.phase-prep td.col-status-data{background:#f6ffed}
+tr.phase-launch td.cell,tr.phase-launch td.del-cell,tr.phase-launch td.ms-cell,tr.phase-launch td.col-status-data{background:#fff7e6}
+tr.phase-exec td.cell,tr.phase-exec td.del-cell,tr.phase-exec td.ms-cell,tr.phase-exec td.col-status-data{background:#e6f7ff}
+tr.phase-review td.cell,tr.phase-review td.del-cell,tr.phase-review td.ms-cell,tr.phase-review td.col-status-data{background:#f9f0ff}
+tr.phase-milestone td.cell,tr.phase-milestone td.del-cell,tr.phase-milestone td.ms-cell,tr.phase-milestone td.col-status-data{background:#fff0f6}
 
-/* Row hover effect */
-tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cell{filter:brightness(0.97)}
+/* Row hover effect on frozen cells */
+tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cell,tr:hover td.col-status-data{filter:brightness(0.97)}
 
-/* === CELL TYPES === */
+/* === CELL TYPES (frozen columns) === */
 .cell{padding:5px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.del-cell{cursor:default;padding:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.del-cell{cursor:default;padding:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative}
 .del-cell:hover{background:#f0f0f0!important}
 .ms-cell{text-align:center;padding:4px;cursor:pointer;font-size:15px;line-height:1}
+.col-status-data{text-align:center;padding:5px}
 
 /* Status badges */
 .status-badge{padding:1px 7px;border-radius:10px;font-size:11px;white-space:nowrap;display:inline-block}
@@ -153,7 +138,11 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 .status-progress{background:#fff7b3;color:#ad6800}
 .status-pending{background:#f0f0f0;color:#999}
 
-/* === TASK BARS === */
+/* Column resize handles */
+.resize-handle{position:absolute;right:0;top:0;bottom:0;width:4px;cursor:col-resize;z-index:50;transition:background .15s}
+.resize-handle:hover,.resize-handle.active{background:#1890ff}
+
+/* === TASK BARS (gantt chart area) === */
 .gantt-cell{position:relative;height:32px;min-width:100%}
 .task-bar{position:absolute;height:20px;border-radius:4px;top:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.1);transition:all .15s}
 .task-bar:hover{filter:brightness(1.1);transform:translateY(-1px)}
@@ -164,13 +153,11 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 .today-line{position:absolute;top:0;bottom:0;width:2px;background:#ff4d4f;z-index:5;pointer-events:none}
 .today-label{position:absolute;top:-24px;left:50%;transform:translateX(-50%);font-size:9px;color:#ff4d4f;white-space:nowrap}
 
-/* Row actions (delete button) */
+/* Row actions (delete button) — embedded inside del-cell */
 .row-actions{position:absolute;right:2px;top:2px;opacity:0;transition:opacity .2s;z-index:15}
-.del-cell:hover .row-actions,.ms-cell:hover .row-actions{opacity:1}
+.del-cell:hover .row-actions{opacity:1}
 .row-actions button{background:none;border:none;cursor:pointer;font-size:13px;color:#ff4d4f;padding:2px;line-height:1;border-radius:3px}
-.row-actions button:hover{background:#fff1f0}
-
-/* === ADMIN PANEL === */
+.row-actions button:hover{background:#fff1f0}/* === ADMIN PANEL === */
 .admin-section{background:#fff;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:20px;margin-bottom:16px}
 .admin-section h2{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .member-table{width:100%;border-collapse:collapse;font-size:13px}
@@ -337,6 +324,89 @@ const PHASE_ORDER = ["准备阶段","项目实施","实施阶段","回顾阶段"
 const PHASE_COLORS = {"准备阶段":"#52c41a","项目实施":"#faad14","实施阶段":"#1890ff","回顾阶段":"#722ed1"};
 
 // ============================================================
+// COLUMN DEFINITIONS (frozen left columns with dynamic widths)
+// ============================================================
+const COL_DEFS = [
+  { id:'phase',       label:'阶段',    width:70,  minW:50  },
+  { id:'content',     label:'内容',    width:100, minW:60  },
+  { id:'deliverable', label:'产出',    width:170, minW:80  },
+  { id:'company',     label:'公司',    width:55,  minW:40  },
+  { id:'responsible', label:'负责',    width:85,  minW:50  },
+  { id:'status',      label:'状态',    width:55,  minW:40  },
+  { id:'milestone',   label:'◆',       width:40,  minW:30  },
+];
+
+function loadColWidths() {
+  try {
+    const s = localStorage.getItem('ogd_col_widths');
+    if (s) { const w = JSON.parse(s); COL_DEFS.forEach(c => { if (w[c.id]) c.width = w[c.id]; }); }
+  } catch(e) {}
+}
+function saveColWidths() {
+  const o = {}; COL_DEFS.forEach(c => o[c.id]=c.width);
+  try { localStorage.setItem('ogd_col_widths', JSON.stringify(o)); } catch(e) {}
+}
+
+function applyColStyles() {
+  let left=0;
+  COL_DEFS.forEach(c => { c._left = left; left += c.width; });
+  const total=COL_DEFS.reduce((s,c)=>s+c.width,0);
+
+  let css = '';
+  COL_DEFS.forEach((c,i) => {
+    const w = c.width, l = c._left;
+    css += `.col-${c.id}{width:${w}px;min-width:${w}px;max-width:${w}px;}`;
+    css += `thead .col-${c.id}{left:${l}px;z-index:31;}`;
+    const dataSel = {
+      phase:'td.phase-label', content:'td.cell.col-content', deliverable:'td.del-cell.col-deliverable',
+      company:'td.cell.col-company', responsible:'td.cell.col-responsible',
+      status:'td.col-status-data', milestone:'td.ms-check'
+    }[c.id];
+    if (dataSel) css += `${dataSel}{left:${l}px;}`;
+  });
+  css += `td.sep-col{border-right:2px solid #91d5ff}th.sep-col{border-right:2px solid #91d5ff}`;
+
+  let el = document.getElementById('colDynStyles');
+  if (!el) { el=document.createElement('style'); el.id='colDynStyles'; document.head.appendChild(el); }
+  el.textContent = css;
+}
+
+function initResizeHandles() {
+  document.querySelectorAll('.resize-handle').forEach(h => {
+    h.removeEventListener('mousedown', h._rd);
+    h._rd = function(e) {
+      e.preventDefault(); e.stopPropagation();
+      const colId = this.dataset.col;
+      const colIdx = COL_DEFS.findIndex(c=>c.id===colId);
+      if(colIdx<0) return;
+      const col = COL_DEFS[colIdx];
+      const startX = e.clientX, startW = col.width;
+      this.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      function onMove(ev) {
+        const dx = ev.clientX - startX;
+        const newW = Math.max(col.minW, startW + dx);
+        col.width = newW;
+        applyColStyles();
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        h.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        saveColWidths();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    };
+    h.addEventListener('mousedown', h._rd);
+  });
+}
+
+// ============================================================
 // AUTH
 // ============================================================
 /* Password login support */
@@ -490,6 +560,7 @@ function canDelete() {
 // GANTT RENDER
 // ============================================================
 function renderGantt() {
+  applyColStyles();
   const data = msOnly ? tasks.filter(t=>t.milestone) : tasks;
   if (!data.length) {
     document.getElementById('ganttBody').innerHTML = '<tr><td colspan="20" style="text-align:center;padding:40px;color:#999">暂无任务</td></tr>';
@@ -508,15 +579,19 @@ function renderGantt() {
   mn.setDate(mn.getDate()-3); mx.setDate(mx.getDate()+7);
   const td = Math.round((mx-mn)/86400000);
 
-  // Headers
+  // Month headers
   let cur = new Date(mn);
   let mgs=[],cm=null;
   for(let i=0;i<=td;i++){const m=cur.getMonth();if(m!==cm){cm=m;mgs.push({month:m,year:cur.getFullYear(),startIdx:i,label:`${cur.getFullYear()}/${String(m+1).padStart(2,'0')}`});}cur.setDate(cur.getDate()+1);}
 
-  let h=`<tr class="date-header"><th style="width:65px;min-width:65px">阶段</th><th style="width:95px;min-width:95px">内容</th><th style="width:165px;min-width:165px">产出</th><th style="width:50px;min-width:50px">公司</th><th style="width:80px;min-width:80px">负责</th><th style="width:50px;min-width:50px">状态</th><th style="width:35px;min-width:35px">◆</th><th style="width:35px;min-width:35px">🗑️</th>
-  <th colspan="${td+1}" style="padding:0;border-left:2px solid #91d5ff"><div style="display:flex">`;
+  // === Build header row 1 (months) ===
+  let fc = COL_DEFS.map(c=>`<th class="col-${c.id}">${c.label}<div class="resize-handle" data-col="${c.id}" title="拖拽调整宽度"></div></th>`).join('');
+  let h = `<tr class="date-header">${fc}<th colspan="${td+1}" class="sep-col" style="padding:0;border-left:2px solid #91d5ff"><div style="display:flex">`;
   mgs.forEach((mg,i)=>{const sp=(i<mgs.length-1?mgs[i+1].startIdx:td+1)-mg.startIdx;h+=`<div style="flex:${sp};text-align:center;padding:4px 0;font-weight:700;color:#1890ff;font-size:12px;border-right:1px solid #e6f0ff">${mg.label}</div>`;});
-  h+=`</div></th></tr><tr class="date-header"><th colspan="8" style="border-right:2px solid #91d5ff"></th>`;
+  h+=`</div></th></tr>`;
+
+  // === Build header row 2 (days) ===
+  h+=`<tr class="date-header"><th colspan="7" class="sep-col" style="border-right:2px solid #91d5ff"></th>`;
   cur=new Date(mn);
   for(let i=0;i<=td;i++){
     const day=cur.getDay(),we=day===0||day===6;
@@ -527,7 +602,7 @@ function renderGantt() {
   h+='</tr>';
   document.getElementById('ganttHead').innerHTML = h;
 
-  // Body
+  // === Body ===
   const barColors={"准备阶段":"#52c41a","项目实施":"#faad14","实施阶段":"#1890ff","回顾阶段":"#722ed1"};
   let grp={};
   data.forEach(t=>{if(!grp[t.phase])grp[t.phase]=[];grp[t.phase].push(t);});
@@ -542,35 +617,40 @@ function renderGantt() {
       const s=t.start_date?new Date(t.start_date):null, e=t.end_date?new Date(t.end_date):null;
       const bc=isMs?'linear-gradient(135deg,#eb2f96,#722ed1)':(sc==='完成'?'#52c41a':(sc==='进行中'?'#faad14':(barColors[t.phase]||'#bfbfbf')));
       const canE=canEdit(t.company);
+      const showDel = canDelete();
       
       b+=`<tr class="phase-${pClass}${isMs?' phase-milestone':''}">`;
-      if(i===0) b+=`<td class="phase-label" rowspan="${items.length}">${pn}</td>`;
-      b+=`<td class="cell">${t.content}</td>`;
-      b+=`<td class="del-cell" ${canE?`ondblclick="editTask(${t.id})"`:''} title="${canE?'双击编辑':''}">${isMs?'◆ ':''}${t.deliverable}</td>`;
-      b+=`<td class="cell" style="text-align:center">${t.company||''}</td>`;
-      b+=`<td class="cell" style="text-align:center">${t.responsible||''}</td>`;
-      b+=`<td style="text-align:center;padding:5px"><span class="status-badge status-${sc==='完成'?'done':(sc==='进行中'?'progress':'pending')}">${sc||'待开始'}</span></td>`;
-      b+=`<td class="ms-cell" style="text-align:center;padding:4px;cursor:pointer;font-size:15px" onclick="${canE?`toggleMs(${t.id})`:''}" title="${canE?'点击切换里程碑':''}">${isMs?'◆':'◇'}</td>`;
-      b+=`<td style="text-align:center;padding:2px;position:relative"><div class="row-actions">${canDelete()?`<button onclick="deleteTask(${t.id})" title="删除">🗑️</button>`:''}</div></td>`;
+      if(i===0) b+=`<td class="phase-label col-phase" rowspan="${items.length}">${pn.replace('阶段','')}</td>`;
+      b+=`<td class="cell col-content">${t.content}</td>`;
+      b+=`<td class="del-cell col-deliverable" ${canE?`ondblclick="editTask(${t.id})"`:''} title="${canE?'双击编辑':''}">${isMs?'◆ ':''}${t.deliverable}${showDel?`<div class="row-actions"><button onclick="deleteTask(${t.id})" title="删除">🗑️</button></div>`:''}</td>`;
+      b+=`<td class="cell col-company" style="text-align:center">${t.company||''}</td>`;
+      b+=`<td class="cell col-responsible" style="text-align:center">${t.responsible||''}</td>`;
+      b+=`<td class="col-status-data"><span class="status-badge status-${sc==='完成'?'done':(sc==='进行中'?'progress':'pending')}">${sc||'待开始'}</span></td>`;
+      b+=`<td class="ms-check" ${canE?`onclick="toggleMs(${t.id})"`:''} title="${canE?'点击切换里程碑':''}">${isMs?'◆':'◇'}</td>`;
 
-      // Gantt cell
-      b+=`<td colspan="${td+1}" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:32px"><div class="gantt-cell">`;
+      // Gantt chart cell
+      b+=`<td class="sep-col" colspan="${td+1}" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:32px"><div class="gantt-cell">`;
       
-      // Today
+      // Today line
       const to=Math.round((new Date()-mn)/86400000);
       if(to>=0&&to<=td) b+=`<div class="today-line" style="left:${to*CELL_W+CELL_W/2}px"><span class="today-label">今天</span></div>`;
 
       if(s&&e){
         const so=Math.round((s-mn)/86400000), eo=Math.round((e-mn)/86400000);
         const bw=Math.max((eo-so+1)*CELL_W-4,8), bl=so*CELL_W+2, lbl=t.deliverable.length>6?t.deliverable.slice(0,6)+'..':t.deliverable;
-        b+=`<div class="task-bar ${isMs?'bar-milestone':'bar-'+(sc==='完成'?'ready':(sc==='进行中'?'active':'wait'))}" style="left:${bl}px;width:${bw}px;background:${bc}" ${canE?`ondblclick="editTask(${t.id})"`:''} title="${isMs?'◆里程碑: ':''}${t.deliverable}\n${t.start_date||'?'}→${t.end_date||'?'}\n${t.responsible?'负责人:'+t.responsible:''}\n状态:${sc||'待开始'}">${bw>50?lbl:''}</div>`;
+        b+=`<div class="task-bar ${isMs?'bar-milestone':'bar-'+(sc==='完成'?'ready':(sc==='进行中'?'active':'wait'))}" style="left:${bl}px;width:${bw}px;background:${bc}" ${canE?`ondblclick="editTask(${t.id})"`:''} title="${isMs?'◆里程碑: ':''}${t.deliverable}
+${t.start_date||'?'}→${t.end_date||'?'}
+${t.responsible?'负责人:'+t.responsible:''}
+状态:${sc||'待开始'}">${bw>50?lbl:''}</div>`;
       } else if(!s&&e){
         const eo=Math.round((e-mn)/86400000);
-        b+=`<div class="task-bar" style="left:${eo*CELL_W+12}px;width:12px;background:#bbb" title="${t.deliverable}\n截止:${t.end_date}"></div>`;
+        b+=`<div class="task-bar" style="left:${eo*CELL_W+12}px;width:12px;background:#bbb" title="${t.deliverable}
+截止:${t.end_date}"></div>`;
       } else if(!s&&!e&&(t.phase==="实施阶段"||t.phase==="回顾阶段")){
         const ro=Math.round((new Date("2026-07-10")-mn)/86400000), re=td;
         const bw=Math.max((re-ro+1)*CELL_W-4,8), bl=ro*CELL_W+2;
-        b+=`<div class="task-bar" style="left:${bl}px;width:${bw}px;background:${bc};opacity:.4;border:1px dashed ${bc}" title="${t.deliverable}\n（持续进行中）"></div>`;
+        b+=`<div class="task-bar" style="left:${bl}px;width:${bw}px;background:${bc};opacity:.4;border:1px dashed ${bc}" title="${t.deliverable}
+（持续进行中）"></div>`;
       }
       b+='</div></td></tr>';
     });
@@ -578,6 +658,8 @@ function renderGantt() {
   document.getElementById('ganttBody').innerHTML = b;
   renderMsOverview();
   updatePermNotice();
+  // Re-bind resize handles after DOM update
+  setTimeout(initResizeHandles, 0);
 }
 
 function renderMsOverview() {
@@ -809,6 +891,7 @@ document.getElementById('loginEmail').addEventListener('keydown',function(e){if(
 // INIT
 // ============================================================
 async function init() {
+  loadColWidths();
   const loading = document.getElementById('loadingScreen');
   
   // Check Supabase config
