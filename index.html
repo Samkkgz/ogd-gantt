@@ -895,7 +895,10 @@ async function inviteMember() {
     const { data, error } = await sb.auth.signUp({
       email: email,
       password: Math.random().toString(36).slice(2,10) + 'A1!',
-      options: { data: { name, company, role } }
+      options: { 
+        data: { name, company, role },
+        emailRedirectTo: window.location.origin + window.location.pathname
+      }
     });
     if (error) throw error;
     if (!data?.user) throw new Error('注册失败 - 可能邮箱已被使用');
