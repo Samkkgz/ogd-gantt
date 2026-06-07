@@ -898,6 +898,7 @@ async function renderAdmin() {
           <option value="pending" ${st==="pending"?"selected":""}>⏳ 待确认</option>
           <option value="disabled" ${st==='disabled'?'selected':''}>🔴 关闭</option>
         </select>
+        ${st==='pending'?`<button onclick="resendInvite('${m.email}','${m.name}')" style="padding:2px 8px;font-size:11px;border:1px solid #1890ff;background:#e6f7ff;color:#1890ff;border-radius:4px;cursor:pointer">📧 重发</button>`:''}
       `:'—'}</td>
     </tr>`;
   });
@@ -1057,6 +1058,26 @@ async function changeRole(userId, newRole) {
     const label = newRole==='admin'?'管理员':'成员';
     await logAction('变更角色', `用户ID:${userId} -> ${label}`);
     showToast('✅ 角色已更新','success'); await renderAdmin();
+  }
+}
+
+async function resendInvite(email, name) {
+  if (!email) return showToast('邮箱为空','error');
+  try {
+    // Send magic link email (works for existing unconfirmed users)
+    const { error } = await sb.auth.signInWithOtp({ 
+      email: email,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    });
+    if (error) throw error;
+    await logAction('重发邀请', `${name||''} (${email}) 邀请邮件已重发`);
+    showToast(`📧 邀请邮件已重发至 ${email}`,'success');
+  } catch(e) {
+    const msg = e.message || '';
+    if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
+      showToast('❌ 发送失败: ' + msg + ' — 需在Supabase后台→Authentication→Settings配置SMTP邮件服务','error');
+    else
+      showToast('❌ 发送失败: ' + msg,'error');
   }
 }
 
