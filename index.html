@@ -67,22 +67,22 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 /* Frozen columns */
 .frozen-cols td{position:sticky;z-index:10}
 .frozen-cols td:first-child{left:0;z-index:11}
-.frozen-cols td:nth-child(2){left:70px}
-.frozen-cols td:nth-child(3){left:170px}
-.frozen-cols td:nth-child(4){left:340px}
-.frozen-cols td:nth-child(5){left:395px}
-.frozen-cols td:nth-child(6){left:480px}
-.frozen-cols td:nth-child(7){left:535px}
-.frozen-cols td:nth-child(8){left:575px}
+.frozen-cols td:nth-child(2){left:65px}
+.frozen-cols td:nth-child(3){left:160px}
+.frozen-cols td:nth-child(4){left:325px}
+.frozen-cols td:nth-child(5){left:375px}
+.frozen-cols td:nth-child(6){left:455px}
+.frozen-cols td:nth-child(7){left:505px}
+.frozen-cols td:nth-child(8){left:540px}
 .frozen-cols th{position:sticky;top:0;z-index:30}
 .frozen-cols th:first-child{left:0;z-index:31}
-.frozen-cols th:nth-child(2){left:70px;z-index:31}
-.frozen-cols th:nth-child(3){left:170px;z-index:31}
-.frozen-cols th:nth-child(4){left:340px;z-index:31}
-.frozen-cols th:nth-child(5){left:395px;z-index:31}
-.frozen-cols th:nth-child(6){left:480px;z-index:31}
-.frozen-cols th:nth-child(7){left:535px;z-index:31}
-.frozen-cols th:nth-child(8){left:575px;z-index:31;border-right:2px solid #91d5ff}
+.frozen-cols th:nth-child(2){left:65px;z-index:31}
+.frozen-cols th:nth-child(3){left:160px;z-index:31}
+.frozen-cols th:nth-child(4){left:325px;z-index:31}
+.frozen-cols th:nth-child(5){left:375px;z-index:31}
+.frozen-cols th:nth-child(6){left:455px;z-index:31}
+.frozen-cols th:nth-child(7){left:505px;z-index:31}
+.frozen-cols th:nth-child(8){left:540px;z-index:31;border-right:2px solid #91d5ff}
 
 /* Phase colors */
 .phase-prep td{background:#f6ffed}
@@ -191,6 +191,18 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 .toast-error{background:#ff4d4f;color:#fff}
 
 @media print{.tab-bar,.toolbar,.user-info button,.permission-notice{display:none}}
+
+/* Ensure frozen cells have proper backgrounds */
+.phase-prep td.phase-label{background:#d9f7be}
+.phase-launch td.phase-label{background:#ffe58f}
+.phase-exec td.phase-label{background:#91d5ff}
+.phase-review td.phase-label{background:#d3adf7}
+.phase-milestone td.phase-label{background:#ffadd2}
+.phase-prep .del-cell,.phase-prep .cell,.phase-prep .ms-cell{background:#f6ffed}
+.phase-launch .del-cell,.phase-launch .cell,.phase-launch .ms-cell{background:#fff7e6}
+.phase-exec .del-cell,.phase-exec .cell,.phase-exec .ms-cell{background:#e6f7ff}
+.phase-review .del-cell,.phase-review .cell,.phase-review .ms-cell{background:#f9f0ff}
+.phase-milestone .del-cell,.phase-milestone .cell,.phase-milestone .ms-cell{background:#fff0f6}
 </style>
 </head>
 <body>
@@ -248,9 +260,9 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
       </div>
     </div>
     <div class="gantt-wrapper">
-      <table>
+      <table class="frozen-cols" id="ganttTable">
         <thead id="ganttHead"></thead>
-        <tbody id="ganttBody" class="frozen-cols"></tbody>
+        <tbody id="ganttBody" class=""></tbody>
       </table>
     </div>
   </div>
@@ -782,7 +794,7 @@ document.addEventListener('keydown',e=>{
 
 document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 document.getElementById('memberModal').addEventListener('click',function(e){if(e.target===this)closeMemberModal();});
-document.getElementById('loginEmail').addEventListener('keydown',function(e){if(e.key==='Enter')sendMagicLink();});
+document.getElementById('loginEmail').addEventListener('keydown',function(e){if(e.key==='Enter'){if(document.getElementById('loginPassword').value){loginWithPassword()}else{sendMagicLink()}}});
 
 // ============================================================
 // INIT
