@@ -167,7 +167,12 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 .row-actions{position:absolute;right:2px;top:2px;opacity:0;transition:opacity .2s;z-index:15}
 .del-cell:hover .row-actions{opacity:1}
 .row-actions button{background:none;border:none;cursor:pointer;font-size:13px;color:#ff4d4f;padding:2px;line-height:1;border-radius:3px}
-.row-actions button:hover{background:#fff1f0}/* === ADMIN PANEL === */
+.row-actions button:hover{background:#fff1f0}/* Admin table status badges */
+.member-table .status-pending{background:#fff7b3;color:#ad6800}
+.member-table .status-active{background:#d9f7be;color:#237804}
+.member-table .status-disabled{background:#f0f0f0;color:#999}
+
+/* === ADMIN PANEL === */
 .admin-section{background:#fff;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:20px;margin-bottom:16px}
 .admin-section h2{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .member-table{width:100%;border-collapse:collapse;font-size:13px}
@@ -861,16 +866,30 @@ async function renderAdmin() {
   // Members table
   html += `<div class="admin-section"><h2>👥 团队成员</h2>
     <table class="member-table">
-      <tr><th>邮箱</th><th>姓名</th><th>团队</th><th>角色</th><th>操作</th></tr>`;
+      <tr><th>邮箱</th><th>姓名</th><th>团队</th><th>角色</th><th>状态</th><th>操作</th></tr>`;
   
   if(members) members.forEach(m => {
     const canManage = isSuper || (isAdmin && m.company === currentUser.company);
+    const st = m.status||'active';
+    const stLabel = st==='pending'?'⏳ 待确认':(st==='disabled'?'🔴 关闭':'🟢 正常');
+    const stClass = 'status-' + st;
     html += `<tr>
       <td>${m.email||'—'}</td>
       <td>${m.name||'—'}</td>
       <td><span class="user-badge badge-${m.company}">${m.company||'—'}</span></td>
       <td><span class="user-badge badge-${m.role==='super_admin'?'super_admin':(m.role==='admin'?'admin':'')}">${m.role==='super_admin'?'超级管理员':(m.role==='admin'?'管理员':'成员')}</span></td>
-      <td>${canManage&&m.role!=='super_admin'?`<select onchange="changeRole('${m.id}',this.value)"><option value="member" ${m.role==='member'?'selected':''}>成员</option><option value="admin" ${m.role==='admin'?'selected':''}>管理员</option></select><button onclick="deleteMember('${m.id}','${m.name||m.email}')" style="margin-left:6px;padding:3px 8px;border:none;border-radius:4px;background:#fff1f0;color:#ff4d4f;cursor:pointer;font-size:11px" title="删除此成员">🗑️</button>`:'—'}</td>
+      <td><span class="status-badge ${stClass}">${stLabel}</span></td>
+      <td>${canManage&&m.role!=='super_admin'?`
+        <select onchange="changeRole('${m.id}',this.value)" style="margin-right:4px">
+          <option value="member" ${m.role==='member'?'selected':''}>成员</option>
+          <option value="admin" ${m.role==='admin'?'selected':''}>管理员</option>
+        </select>
+        <select onchange="changeUserStatus('${m.id}',this.value)" style="margin-right:4px">
+          <option value="active" ${st==='active'?'selected':''}>🟢 正常</option>
+          ${st==='pending'?'<option value="pending" selected>⏳ 待确认</option>':''}
+          <option value="disabled" ${st==='disabled'?'selected':''}>🔴 关闭</option>
+        </select>
+      `:'—'}</td>
     </tr>`;
   });
   html += '</table></div>';
@@ -893,6 +912,18 @@ async function renderAdmin() {
   if (!isSuper) document.getElementById('inviteCompany').value = currentUser.company;
 }
 
+async function logAction(action, detail) {
+  if (!currentUser) return;
+  try {
+    await sb.from('activity_log').insert({
+      user_id: currentUser.id,
+      user_name: currentUser.name || currentUser.email,
+      action: action,
+      detail: detail
+    });
+  } catch(e) { /* ignore log errors */ }
+}
+
 async function inviteMember() {
   const email = document.getElementById('inviteEmail').value.trim();
   const name = document.getElementById('inviteName').value.trim();
@@ -902,22 +933,32 @@ async function inviteMember() {
   if (!name) return showToast('请输入姓名','error');
   
   try {
-    // Create user - trigger auto-creates profile with name/company/role
+    const tempPw = Math.random().toString(36).slice(2,10) + 'A1!';
     const { data, error } = await sb.auth.signUp({
       email: email,
-      password: Math.random().toString(36).slice(2,10) + 'A1!',
+      password: tempPw,
       options: { 
         data: { name, company, role },
         emailRedirectTo: window.location.origin + window.location.pathname
       }
     });
     if (error) throw error;
-    if (!data?.user) throw new Error('注册失败 - 可能邮箱已被使用');
     
-    // The database trigger on_auth_user_created creates the profile
-    // with name, company, role from user_metadata
+    if (!data?.user?.identities?.length) {
+      // Email already registered - update profile info
+      await sb.from('profiles').update({name, company, role}).eq('id', data.user.id);
+      await logAction('更新成员', `${name} (${email}) 信息已更新`);
+      showToast(`✅ 已更新成员「${name}」的信息`,'success');
+    } else {
+      // New user - create profile with pending status
+      const { error: pe } = await sb.from('profiles').upsert({
+        id: data.user.id, email, name, company, role, status: 'pending'
+      });
+      if (pe) throw pe;
+      await logAction('邀请成员', `${name} (${email}) 已邀请，团队:${company}，角色:${role}`);
+      showToast(`📧 邀请已发送至 ${email}，待用户确认`,'info');
+    }
     
-    showToast(`📧 邀请已发送至 ${email}，请查看邮箱完成注册`,'success');
     document.getElementById('inviteEmail').value='';
     document.getElementById('inviteName').value='';
     renderAdmin();
@@ -928,27 +969,29 @@ async function inviteMember() {
 
 function closeMemberModal() { document.getElementById('memberModal').classList.remove('active'); }
 
-async function deleteMember(userId, userName) {
-  if (!confirm(`确定要删除成员「${userName||userId}」吗？此操作不可撤销。`)) return;
+async function changeUserStatus(userId, newStatus) {
   if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'admin')) 
     return showToast('⛔ 没有权限','error');
   try {
-    // First remove task references (set created_by to null)
-    await sb.from('tasks').update({created_by: null}).eq('created_by', userId);
-    // Then delete the profile
-    const { error } = await sb.from('profiles').delete().eq('id', userId);
+    const { error } = await sb.from('profiles').update({status: newStatus}).eq('id', userId);
     if (error) throw error;
-    showToast(`🗑️ 已删除成员「${userName||''}」`,'success');
+    const label = newStatus==='active'?'正常':(newStatus==='disabled'?'关闭':'待确认');
+    await logAction('变更用户状态', `用户ID:${userId} -> ${label}`);
+    showToast(`✅ 状态已变更为「${label}」`,'success');
     renderAdmin();
   } catch(e) {
-    showToast('❌ 删除失败: '+e.message,'error');
+    showToast('❌ 变更失败: '+e.message,'error');
   }
 }
 
 async function changeRole(userId, newRole) {
   const { error } = await sb.from('profiles').update({role:newRole}).eq('id',userId);
   if(error) showToast('❌ 更新失败','error');
-  else { showToast('✅ 角色已更新','success'); renderAdmin(); }
+  else {
+    const label = newRole==='admin'?'管理员':'成员';
+    await logAction('变更角色', `用户ID:${userId} -> ${label}`);
+    showToast('✅ 角色已更新','success'); renderAdmin();
+  }
 }
 
 // ============================================================
@@ -1014,8 +1057,19 @@ async function init() {
   }
   
   // Listen for auth state changes
-  sb.auth.onAuthStateChange((event, session) => {
+  sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session) {
+      // Check user status before allowing access
+      const { data: profile } = await sb.from('profiles').select('status').eq('id', session.user.id).single();
+      if (profile?.status === 'disabled') {
+        await sb.auth.signOut();
+        showToast('⛔ 该账号已被禁用，请联系管理员','error');
+        return;
+      }
+      // If user just confirmed email, update status to active
+      if (profile?.status === 'pending') {
+        await sb.from('profiles').update({status: 'active'}).eq('id', session.user.id);
+      }
       loadProfile(session.user);
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
