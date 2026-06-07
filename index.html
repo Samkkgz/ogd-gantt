@@ -924,13 +924,16 @@ async function renderAdmin() {
 async function logAction(action, detail) {
   if (!currentUser) return;
   try {
-    await sb.from('activity_log').insert({
+    const { error: logErr } = await sb.from('activity_log').insert({
       user_id: currentUser.id,
       user_name: currentUser.name || currentUser.email,
       action: action,
       detail: detail
     });
-  } catch(e) { /* ignore log errors */ }
+    if (logErr) console.warn('日志写入失败:', logErr.message);
+  } catch(e) {
+    console.warn('日志写入异常:', e.message);
+  }
 }
 
 async function inviteMember() {
@@ -953,25 +956,39 @@ async function inviteMember() {
     });
     if (error) throw error;
     
+    // Helper: create or update profile via RPC (bypasses RLS)
+    async function ensureProfile(userId, isNew) {
+      const status = isNew ? 'pending' : 'active';
+      // Try RPC first
+      const { error: rpcErr } = await sb.rpc('admin_create_profile', {
+        p_id: userId, p_email: email, p_name: name,
+        p_company: company, p_role: role
+      });
+      if (rpcErr) {
+        // RPC failed - try direct upsert as fallback
+        const { error: pe } = await sb.from('profiles').upsert({
+          id: userId, email, name, company, role, status
+        });
+        if (pe) throw new Error('保存档案失败: ' + (pe.message || JSON.stringify(pe)));
+      }
+    }
+    
     if (!data?.user?.identities?.length) {
-      // Email already registered - update profile info
-      await sb.from('profiles').update({name, company, role}).eq('id', data.user.id);
-      await logAction('更新成员', `${name} (${email}) 信息已更新`);
-      showToast(`✅ 已更新成员「${name}」的信息`,'success');
+      // User already exists in auth.users (e.g. from a previous invite)
+      // Check if profile exists; if not, insert it
+      const { data: existing } = await sb.from('profiles').select('id').eq('id', data.user.id).maybeSingle();
+      if (!existing) {
+        await ensureProfile(data.user.id, false);
+        await logAction('添加成员', `${name} (${email}) 档案已补充`);
+        showToast(`✅ 已添加成员「${name}」`,'success');
+      } else {
+        await sb.from('profiles').update({name, company, role}).eq('id', data.user.id);
+        await logAction('更新成员', `${name} (${email}) 信息已更新`);
+        showToast(`✅ 已更新成员「${name}」的信息`,'success');
+      }
     } else {
       // New user - create profile with pending status
-      let pe;
-      ({ error: pe } = await sb.from('profiles').upsert({
-        id: data.user.id, email, name, company, role, status: 'pending'
-      }));
-      if (pe) {
-        // RLS might block direct insert - try RPC instead
-        const { error: rpcErr } = await sb.rpc('admin_create_profile', {
-          p_id: data.user.id, p_email: email, p_name: name,
-          p_company: company, p_role: role
-        });
-        if (rpcErr) throw rpcErr;
-      }
+      await ensureProfile(data.user.id, true);
       await logAction('邀请成员', `${name} (${email}) 已邀请，团队:${company}，角色:${role}`);
       showToast(`📧 邀请已发送至 ${email}，待用户确认`,'info');
     }
@@ -980,7 +997,13 @@ async function inviteMember() {
     document.getElementById('inviteName').value='';
     await renderAdmin();
   } catch(e) {
-    showToast('❌ 邀请失败: '+e.message,'error');
+    const msg = e.message || '';
+    if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
+      showToast('❌ 邀请失败: ' + msg + ' — 需在Supabase后台→Authentication→Settings配置SMTP邮件服务','error');
+    else if (msg.includes('column') || msg.includes('relation') || msg.includes('does not exist'))
+      showToast('❌ 邀请失败: 数据库缺少字段，请先运行迁移脚本。' + msg,'error');
+    else
+      showToast('❌ 邀请失败: ' + msg,'error');
   }
 }
 

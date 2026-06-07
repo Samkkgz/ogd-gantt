@@ -106,6 +106,23 @@ RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
   UPDATE profiles SET status = new_status WHERE id = user_id;
 $$;
 
+
+-- --- ACTIVITY LOG POLICIES ---
+CREATE POLICY "activity_log_insert"
+  ON activity_log FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "activity_log_select"
+  ON activity_log FOR SELECT
+  USING (true);
+
+-- --- PROFILES INSERT ---
+CREATE POLICY "profiles_insert_admin"
+  ON profiles FOR INSERT
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role IN ('super_admin','admin'))
+  );
+
 -- --- TASKS ---
 CREATE POLICY "tasks_read_all"
   ON tasks FOR SELECT
