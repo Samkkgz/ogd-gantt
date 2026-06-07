@@ -989,8 +989,7 @@ async function inviteMember() {
         await sb.from('profiles').update({name, company, role}).eq('id', profileByEmail.id);
         await logAction('更新成员', `${name} (${email}) 信息已更新`);
         showToast(`✅ 已更新成员「${name}」的信息`,'success');
-        document.getElementById('inviteResult').style.display = 'block';
-        document.getElementById('inviteResultMsg').innerHTML = `<strong>✅ 信息已更新</strong>`;
+        window._inviteMsg = `✅ 已更新「${name}」的信息 — 密码未改变，如需重置请在登录页使用"忘记密码"`;
       } else {
         // User exists in auth (can't access via client), no profile - show instructions
         throw new Error('该邮箱已注册但无档案。请在Supabase后台 → Authentication → Users 中找到该用户，记下其UUID，然后手动执行：\nINSERT INTO profiles (id, email, name, company, role, status) VALUES (\'该UUID\', \'' + email + '\', \'' + name + '\', \'' + company + '\', \'' + role + '\', \'pending\');');
@@ -1003,32 +1002,35 @@ async function inviteMember() {
         await ensureProfile(userId, false);
         await logAction('添加成员', `${name} (${email}) 档案已补充`);
         showToast(`✅ 已添加成员「${name}」`,'success');
-        document.getElementById('inviteResult').style.display = 'block';
-        document.getElementById('inviteResultMsg').innerHTML = `<strong>✅ 已添加成员「${name}」</strong><br>
-        <span>初始密码：<code style="background:#f0f0f0;padding:2px 8px;border-radius:4px;font-size:14px;user-select:all">${tempPw}</code></span><br>
-        <span style="color:#999;font-size:12px">请将密码告知用户，首次登录后建议立即修改密码</span>`;
+        window._invitePw = tempPw;
+        window._inviteEmail = email;
       } else {
         await sb.from('profiles').update({name, company, role}).eq('id', userId);
         await logAction('更新成员', `${name} (${email}) 信息已更新`);
         showToast(`✅ 已更新成员「${name}」的信息`,'success');
-        document.getElementById('inviteResult').style.display = 'block';
-        document.getElementById('inviteResultMsg').innerHTML = `<strong>✅ 已更新「${name}」的信息</strong><br>
-        <span>密码未改变，如用户忘记密码请在登录页使用"忘记密码"重置</span>`;
+        window._inviteMsg = `✅ 已更新「${name}」的信息 — 密码未改变，如用户忘记密码请在登录页使用"忘记密码"重置`;
       }
     } else {
       // New user or re-invite - create/update profile with pending status
       await ensureProfile(data.user.id, true);
       await logAction('邀请成员', `${name} (${email}) 已邀请，团队:${company}，角色:${role}`);
-      document.getElementById('inviteResult').style.display = 'block';
-      document.getElementById('inviteResultMsg').innerHTML = `<strong>✅ 邀请已发送至 ${email}</strong><br>
-        <span>初始密码：<code style="background:#f0f0f0;padding:2px 8px;border-radius:4px;font-size:14px;user-select:all">${tempPw}</code></span><br>
-        <span style="color:#999;font-size:12px">请将密码告知用户，首次登录后建议立即修改密码</span>`;
       showToast('📧 邀请已发送','success');
+      window._invitePw = tempPw;
+      window._inviteEmail = email;
     }
     
     document.getElementById('inviteEmail').value='';
     document.getElementById('inviteName').value='';
     await renderAdmin();
+    // Show invite result after renderAdmin (so it's not wiped)
+    if (window._invitePw) {
+      document.getElementById('inviteResult').style.display = 'block';
+      document.getElementById('inviteResultMsg').innerHTML = `<strong>✅ 邀请已发送至 ${window._inviteEmail}</strong><br>
+        <span>初始密码：<code style="background:#f0f0f0;padding:2px 8px;border-radius:4px;font-size:14px;user-select:all">${window._invitePw}</code></span><br>
+        <span style="color:#999;font-size:12px">请将密码告知用户，首次登录后建议立即修改密码</span>`;
+      window._invitePw = null;
+      window._inviteEmail = null;
+    }
   } catch(e) {
     const msg = e.message || '';
     if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
