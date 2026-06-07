@@ -843,6 +843,9 @@ function closeModal() { document.getElementById('editModal').classList.remove('a
 // ADMIN PANEL
 // ============================================================
 async function renderAdmin() {
+  // Always fetch fresh profile data
+  const { data: freshMembers } = await sb.from('profiles').select('*').order('created_at', { ascending: false, nullsFirst: false });
+  if (freshMembers) members = freshMembers;
   const isSuper = currentUser.role === 'super_admin';
   const isAdmin = currentUser.role === 'admin';
   const { data: members } = await sb.from('profiles').select('*').order('created_at');
@@ -951,10 +954,18 @@ async function inviteMember() {
       showToast(`✅ 已更新成员「${name}」的信息`,'success');
     } else {
       // New user - create profile with pending status
-      const { error: pe } = await sb.from('profiles').upsert({
+      let pe;
+      ({ error: pe } = await sb.from('profiles').upsert({
         id: data.user.id, email, name, company, role, status: 'pending'
-      });
-      if (pe) throw pe;
+      }));
+      if (pe) {
+        // RLS might block direct insert - try RPC instead
+        const { error: rpcErr } = await sb.rpc('admin_create_profile', {
+          p_id: data.user.id, p_email: email, p_name: name,
+          p_company: company, p_role: role
+        });
+        if (rpcErr) throw rpcErr;
+      }
       await logAction('邀请成员', `${name} (${email}) 已邀请，团队:${company}，角色:${role}`);
       showToast(`📧 邀请已发送至 ${email}，待用户确认`,'info');
     }
@@ -974,7 +985,13 @@ async function changeUserStatus(userId, newStatus) {
     return showToast('⛔ 没有权限','error');
   try {
     const { error } = await sb.from('profiles').update({status: newStatus}).eq('id', userId);
-    if (error) throw error;
+    if (error) {
+      // RLS might block - try RPC approach
+      const { error: rpcError } = await sb.rpc('admin_update_user_status', {
+        user_id: userId, new_status: newStatus
+      });
+      if (rpcError) throw rpcError;
+    }
     const label = newStatus==='active'?'正常':(newStatus==='disabled'?'关闭':'待确认');
     await logAction('变更用户状态', `用户ID:${userId} -> ${label}`);
     showToast(`✅ 状态已变更为「${label}」`,'success');
