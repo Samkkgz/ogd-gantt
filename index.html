@@ -84,17 +84,20 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 /* === GANTT TABLE === */
 .gantt-wrapper{overflow:auto;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.08);max-height:70vh;background:#fff}
 .gantt-wrapper table{border-collapse:separate;border-spacing:0;font-size:13px;min-width:1000px}
-.gantt-wrapper th,.gantt-wrapper td{border:1px solid #e8e8e8;padding:0;vertical-align:middle;position:relative}
+.gantt-wrapper th,.gantt-wrapper td{border:1px solid #e8e8e8;padding:0;vertical-align:middle}
 .gantt-wrapper th{background:#fafafa;font-weight:600;font-size:12px;color:#555;text-align:center}
 
-/* === HEADER FREEZE (vertical) === */
-.gantt-wrapper th{position:sticky;top:0;z-index:20;background:#fafafa}
+/* === HEADER FREEZE (vertical) — thead cells are sticky-top === */
 .date-header th{background:#e6f0ff;padding:4px 2px;font-size:11px;color:#333;border-bottom:2px solid #91d5ff}
+.gantt-wrapper thead th{position:sticky;top:0;z-index:25}
 .date-header+tr th{top:30px}
 
-/* === FROZEN COLUMNS — class-based, left offsets set by JS dynamic applyColStyles() === */
-.frozen-cols td{position:sticky;z-index:10}
-.frozen-cols th{position:sticky;top:0;z-index:30}
+/* === FROZEN LEFT COLUMNS — class-based sticky + z-index; left offsets set by JS applyColStyles() === */
+td.phase-label{position:sticky;z-index:10}
+td.cell{position:sticky;z-index:10}
+td.del-cell{position:sticky;z-index:10}
+td.col-status-data{position:sticky;z-index:10}
+td.ms-check{position:sticky;z-index:10}
 
 /* Separator after last frozen column */
 .gantt-wrapper td.sep-col{border-right:2px solid #91d5ff}
