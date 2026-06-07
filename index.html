@@ -91,6 +91,9 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 .date-header th{background:#e6f0ff;padding:4px 2px;font-size:11px;color:#333;border-bottom:2px solid #91d5ff}
 .gantt-wrapper thead th{position:sticky;top:0;z-index:20}
 .date-header+tr th{top:30px}
+/* First row frozen cells must have opaque backgrounds */
+.date-header th.col-phase,.date-header th.col-content,.date-header th.col-deliverable,.date-header th.col-company,.date-header th.col-responsible,.date-header th.col-status,.date-header th.col-milestone{background:#e6f0ff}
+
 /* Non-frozen header cells below frozen columns */
 .date-header th.header-shim{position:sticky;left:0;z-index:22}
 
@@ -364,7 +367,7 @@ function applyColStyles() {
     // Column widths
     css += `.col-${c.id}{width:${w}px;min-width:${w}px;max-width:${w}px;}`;
     // Header: sticky top + sticky left
-    css += `thead .col-${c.id}{position:sticky;top:0;left:${l}px;z-index:31;}`;
+    css += `thead .col-${c.id}{position:sticky;top:0;left:${l}px;z-index:31;background:#e6f0ff;}`;
     // Body frozen cells: sticky left via fixed-* class
     css += `td.fixed-${c.id}{position:sticky;left:${l}px;z-index:10;}`;
   });
