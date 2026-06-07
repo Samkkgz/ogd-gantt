@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OGD 分销拓展项目 - 团队协作版</title>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;background:#f5f7fa;color:#333;min-height:100vh}
@@ -295,8 +295,8 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 // ============================================================
 // CONFIG —  YOU NEED TO SET THESE
 // ============================================================
-const SUPABASE_URL = 'https://ngvjuufxeiugknnfzfgg.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_FzbUzMQX3Z00aUyj0qik9w_vUI9ntCR';
+const SUPABASE_URL = '';   // ← PASTE YOUR SUPABASE URL HERE
+const SUPABASE_ANON_KEY = ''; // ← PASTE YOUR SUPABASE ANON KEY HERE
 
 // ============================================================
 // SUPABASE CLIENT
@@ -318,6 +318,42 @@ const PHASE_COLORS = {"准备阶段":"#52c41a","项目实施":"#faad14","实施�
 // ============================================================
 // AUTH
 // ============================================================
+/* Password login support */
+let loginMode = 'password';
+
+function toggleLoginMode() {
+  const pw = document.getElementById('loginPassword');
+  const btn = document.getElementById('toggleLoginBtn');
+  const mainBtn = document.getElementById('loginBtn');
+  if (loginMode === 'password') {
+    loginMode = 'magic';
+    pw.classList.add('hide');
+    mainBtn.textContent = '发送登录链接';
+    mainBtn.onclick = sendMagicLink;
+    btn.textContent = '使用密码登录';
+  } else {
+    loginMode = 'password';
+    pw.classList.remove('hide');
+    mainBtn.textContent = '登录';
+    mainBtn.onclick = loginWithPassword;
+    btn.textContent = '使用邮箱链接登录';
+  }
+}
+
+async function loginWithPassword() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!email || !password) return showLoginMsg('请输入邮箱和密码','error');
+  document.getElementById('loginBtn').disabled = true;
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  } catch(e) {
+    showLoginMsg('❌ ' + e.message,'error');
+    document.getElementById('loginBtn').disabled = false;
+  }
+}
+
 async function sendMagicLink() {
   const email = document.getElementById('loginEmail').value.trim();
   if (!email) return showLoginMsg('请输入邮箱','error');
@@ -796,41 +832,5 @@ async function init() {
 
 init();
 </script>
-/* Password login support */
-let loginMode = 'password'; // 'password' or 'magic'
-
-function toggleLoginMode() {
-  const pw = document.getElementById('loginPassword');
-  const btn = document.getElementById('toggleLoginBtn');
-  const mainBtn = document.getElementById('loginBtn');
-  if (loginMode === 'password') {
-    loginMode = 'magic';
-    pw.classList.add('hide');
-    mainBtn.textContent = '发送登录链接';
-    mainBtn.onclick = sendMagicLink;
-    btn.textContent = '使用密码登录';
-  } else {
-    loginMode = 'password';
-    pw.classList.remove('hide');
-    mainBtn.textContent = '登录';
-    mainBtn.onclick = loginWithPassword;
-    btn.textContent = '使用邮箱链接登录';
-  }
-}
-
-async function loginWithPassword() {
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value;
-  if (!email || !password) return showLoginMsg('请输入邮箱和密码','error');
-  document.getElementById('loginBtn').disabled = true;
-  try {
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    // auth state listener will handle the rest
-  } catch(e) {
-    showLoginMsg('❌ ' + e.message,'error');
-    document.getElementById('loginBtn').disabled = false;
-  }
-}
 </body>
 </html>
