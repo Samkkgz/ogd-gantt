@@ -89,8 +89,10 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 
 /* === HEADER FREEZE (vertical) — thead cells are sticky-top === */
 .date-header th{background:#e6f0ff;padding:4px 2px;font-size:11px;color:#333;border-bottom:2px solid #91d5ff}
-.gantt-wrapper thead th{position:sticky;top:0;z-index:25}
+.gantt-wrapper thead th{position:sticky;top:0;z-index:20}
 .date-header+tr th{top:30px}
+/* Non-frozen header cells below frozen columns */
+.date-header th.header-shim{position:sticky;left:0;z-index:22}
 
 /* === FROZEN LEFT COLUMNS — sticky positioning (dynamic + static fallback) === */
 td.fixed-phase{position:sticky;left:0px;z-index:10}
@@ -616,7 +618,7 @@ function renderGantt() {
   h+=`</div></th></tr>`;
 
   // === Build header row 2 (days) ===
-  h+=`<tr class="date-header"><th colspan="7" class="sep-col" style="border-right:2px solid #91d5ff"></th>`;
+  h+=`<tr class="date-header"><th colspan="7" class="sep-col header-shim" style="border-right:2px solid #91d5ff"></th>`;
   cur=new Date(mn);
   for(let i=0;i<=td;i++){
     const day=cur.getDay(),we=day===0||day===6;
