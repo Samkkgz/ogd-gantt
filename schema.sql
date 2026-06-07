@@ -98,7 +98,7 @@ RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
   INSERT INTO profiles (id, email, name, company, role, status)
   VALUES (p_id, p_email, p_name, p_company, p_role, 'pending')
   ON CONFLICT (id) DO UPDATE SET
-    email = EXCLUDED.email, name = EXCLUDED.name, company = EXCLUDED.company, role = EXCLUDED.role;
+    email = EXCLUDED.email, name = EXCLUDED.name, company = EXCLUDED.company, role = EXCLUDED.role, status = 'pending';
 $$;
 
 CREATE OR REPLACE FUNCTION admin_update_user_status(user_id UUID, new_status TEXT)

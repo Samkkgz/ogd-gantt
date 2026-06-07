@@ -112,7 +112,8 @@ BEGIN
     email = EXCLUDED.email,
     name = EXCLUDED.name,
     company = EXCLUDED.company,
-    role = EXCLUDED.role;
+    role = EXCLUDED.role,
+    status = 'pending';
 END;
 $$;
 
