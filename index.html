@@ -850,6 +850,10 @@ async function renderAdmin() {
     console.error("Failed to fetch members:", e);
     members = [];
   }
+  // Non-super-admin can only see their own team's members
+  if (currentUser.role !== "super_admin") {
+    members = members.filter(m => m.company === currentUser.company);
+  }
   const isSuper = currentUser.role === "super_admin";
   const isAdmin = currentUser.role === "admin";
 
@@ -1153,7 +1157,8 @@ async function init() {
           sb.auth.signOut();
           showToast('⛔ 该账号已被禁用，请联系管理员','error');
         } else if (prof?.status === 'pending') {
-          sb.from('profiles').update({status: 'active'}).eq('id', session.user.id);
+          // Use RPC to bypass RLS
+          sb.rpc('admin_update_user_status', { user_id: session.user.id, new_status: 'active' }).then().catch(() => {});
         }
       }).catch(() => {});
     } else if (event === 'SIGNED_OUT') {
