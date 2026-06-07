@@ -62,17 +62,17 @@ END;
 $$;
 
 
--- 7b. 添加缺失的 RLS 策略
--- activity_log insert（允许所有登录用户记录操作）
-CREATE POLICY IF NOT EXISTS "activity_log_insert" ON activity_log FOR INSERT
+-- 7b. 添加缺失的 RLS 策略（先删除再创建，避免重复）
+DROP POLICY IF EXISTS "activity_log_insert" ON activity_log;
+CREATE POLICY "activity_log_insert" ON activity_log FOR INSERT
   WITH CHECK (auth.uid() IS NOT NULL);
 
--- activity_log select（允许所有用户查看日志）
-CREATE POLICY IF NOT EXISTS "activity_log_select" ON activity_log FOR SELECT
+DROP POLICY IF EXISTS "activity_log_select" ON activity_log;
+CREATE POLICY "activity_log_select" ON activity_log FOR SELECT
   USING (true);
 
--- profiles insert（允许管理员添加新档案）
-CREATE POLICY IF NOT EXISTS "profiles_insert_admin" ON profiles FOR INSERT
+DROP POLICY IF EXISTS "profiles_insert_admin" ON profiles;
+CREATE POLICY "profiles_insert_admin" ON profiles FOR INSERT
   WITH CHECK (
     EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role IN ('super_admin','admin'))
   );

@@ -945,6 +945,29 @@ async function inviteMember() {
   if (!name) return showToast('请输入姓名','error');
   
   try {
+    // Helper: create or update profile via RPC (bypasses RLS)
+    async function ensureProfile(userId, isNew) {
+      if (!userId) throw new Error('用户ID为空，无法创建档案');
+      const status = isNew ? 'pending' : 'active';
+      const { error: rpcErr } = await sb.rpc('admin_create_profile', {
+        p_id: userId, p_email: email, p_name: name,
+        p_company: company, p_role: role
+      });
+      if (rpcErr) {
+        // RPC failed - try direct upsert as fallback
+        const { error: pe } = await sb.from('profiles').upsert({
+          id: userId, email, name, company, role, status
+        });
+        if (pe) {
+          const fkMsg = pe.message && pe.message.includes('foreign key') 
+            ? '该邮箱已在auth系统但档案创建失败，请先在Supabase后台确认该用户是否存在'
+            : pe.message || JSON.stringify(pe);
+          throw new Error(fkMsg);
+        }
+      }
+    }
+    
+    // Try to sign up the user with email+password
     const tempPw = Math.random().toString(36).slice(2,10) + 'A1!';
     const { data, error } = await sb.auth.signUp({
       email: email,
@@ -956,33 +979,29 @@ async function inviteMember() {
     });
     if (error) throw error;
     
-    // Helper: create or update profile via RPC (bypasses RLS)
-    async function ensureProfile(userId, isNew) {
-      const status = isNew ? 'pending' : 'active';
-      // Try RPC first
-      const { error: rpcErr } = await sb.rpc('admin_create_profile', {
-        p_id: userId, p_email: email, p_name: name,
-        p_company: company, p_role: role
-      });
-      if (rpcErr) {
-        // RPC failed - try direct upsert as fallback
-        const { error: pe } = await sb.from('profiles').upsert({
-          id: userId, email, name, company, role, status
-        });
-        if (pe) throw new Error('保存档案失败: ' + (pe.message || JSON.stringify(pe)));
+    // If signUp returned no user, email already exists confirmed
+    if (!data?.user) {
+      // Try to find the user by email in profiles table
+      const { data: profileByEmail } = await sb.from('profiles').select('id').eq('email', email).maybeSingle();
+      if (profileByEmail) {
+        // Update existing profile
+        await sb.from('profiles').update({name, company, role}).eq('id', profileByEmail.id);
+        await logAction('更新成员', `${name} (${email}) 信息已更新`);
+        showToast(`✅ 已更新成员「${name}」的信息`,'success');
+      } else {
+        // User exists in auth (can't access via client), no profile - show instructions
+        throw new Error('该邮箱已注册但无档案。请在Supabase后台 → Authentication → Users 中找到该用户，记下其UUID，然后手动执行：\nINSERT INTO profiles (id, email, name, company, role, status) VALUES (\'该UUID\', \'' + email + '\', \'' + name + '\', \'' + company + '\', \'' + role + '\', \'pending\');');
       }
-    }
-    
-    if (!data?.user?.identities?.length) {
-      // User already exists in auth.users (e.g. from a previous invite)
-      // Check if profile exists; if not, insert it
-      const { data: existing } = await sb.from('profiles').select('id').eq('id', data.user.id).maybeSingle();
+    } else if (!data.user.identities || !data.user.identities.length) {
+      // User exists in auth.users (returned from signUp) - use their ID
+      const userId = data.user.id;
+      const { data: existing } = await sb.from('profiles').select('id').eq('id', userId).maybeSingle();
       if (!existing) {
-        await ensureProfile(data.user.id, false);
+        await ensureProfile(userId, false);
         await logAction('添加成员', `${name} (${email}) 档案已补充`);
         showToast(`✅ 已添加成员「${name}」`,'success');
       } else {
-        await sb.from('profiles').update({name, company, role}).eq('id', data.user.id);
+        await sb.from('profiles').update({name, company, role}).eq('id', userId);
         await logAction('更新成员', `${name} (${email}) 信息已更新`);
         showToast(`✅ 已更新成员「${name}」的信息`,'success');
       }
@@ -1000,13 +1019,14 @@ async function inviteMember() {
     const msg = e.message || '';
     if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
       showToast('❌ 邀请失败: ' + msg + ' — 需在Supabase后台→Authentication→Settings配置SMTP邮件服务','error');
+    else if (msg.includes('foreign key'))
+      showToast('❌ 邀请失败: 该邮箱在认证系统有记录但档案创建失败。详情: ' + msg,'error');
     else if (msg.includes('column') || msg.includes('relation') || msg.includes('does not exist'))
       showToast('❌ 邀请失败: 数据库缺少字段，请先运行迁移脚本。' + msg,'error');
     else
       showToast('❌ 邀请失败: ' + msg,'error');
   }
 }
-
 function closeMemberModal() { document.getElementById('memberModal').classList.remove('active'); }
 
 async function changeUserStatus(userId, newStatus) {
