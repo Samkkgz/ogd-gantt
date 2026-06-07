@@ -92,12 +92,7 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 .gantt-wrapper thead th{position:sticky;top:0;z-index:25}
 .date-header+tr th{top:30px}
 
-/* === FROZEN LEFT COLUMNS — class-based sticky + z-index; left offsets set by JS applyColStyles() === */
-td.phase-label{position:sticky;z-index:10}
-td.cell{position:sticky;z-index:10}
-td.del-cell{position:sticky;z-index:10}
-td.col-status-data{position:sticky;z-index:10}
-td.ms-check{position:sticky;z-index:10}
+/* === FROZEN LEFT COLUMNS — sticky positioning via inline style (getColLeft) === */
 
 /* Separator after last frozen column */
 .gantt-wrapper td.sep-col{border-right:2px solid #91d5ff}
@@ -353,25 +348,23 @@ function saveColWidths() {
 function applyColStyles() {
   let left=0;
   COL_DEFS.forEach(c => { c._left = left; left += c.width; });
-  const total=COL_DEFS.reduce((s,c)=>s+c.width,0);
 
   let css = '';
   COL_DEFS.forEach((c,i) => {
     const w = c.width, l = c._left;
     css += `.col-${c.id}{width:${w}px;min-width:${w}px;max-width:${w}px;}`;
-    css += `thead .col-${c.id}{left:${l}px;z-index:31;}`;
-    const dataSel = {
-      phase:'td.phase-label', content:'td.cell.col-content', deliverable:'td.del-cell.col-deliverable',
-      company:'td.cell.col-company', responsible:'td.cell.col-responsible',
-      status:'td.col-status-data', milestone:'td.ms-check'
-    }[c.id];
-    if (dataSel) css += `${dataSel}{left:${l}px;}`;
+    css += `thead .col-${c.id}{position:sticky;top:0;left:${l}px;z-index:31;}`;
   });
-  css += `td.sep-col{border-right:2px solid #91d5ff}th.sep-col{border-right:2px solid #91d5ff}`;
+  css += 'td.sep-col{border-right:2px solid #91d5ff}th.sep-col{border-right:2px solid #91d5ff}';
 
   let el = document.getElementById('colDynStyles');
   if (!el) { el=document.createElement('style'); el.id='colDynStyles'; document.head.appendChild(el); }
   el.textContent = css;
+}
+
+function getColLeft(id) {
+  const c = COL_DEFS.find(x => x.id === id);
+  return c ? c._left : 0;
 }
 
 function initResizeHandles() {
@@ -623,13 +616,13 @@ function renderGantt() {
       const showDel = canDelete();
       
       b+=`<tr class="phase-${pClass}${isMs?' phase-milestone':''}">`;
-      if(i===0) b+=`<td class="phase-label col-phase" rowspan="${items.length}">${pn.replace('阶段','')}</td>`;
-      b+=`<td class="cell col-content">${t.content}</td>`;
-      b+=`<td class="del-cell col-deliverable" ${canE?`ondblclick="editTask(${t.id})"`:''} title="${canE?'双击编辑':''}">${isMs?'◆ ':''}${t.deliverable}${showDel?`<div class="row-actions"><button onclick="deleteTask(${t.id})" title="删除">🗑️</button></div>`:''}</td>`;
-      b+=`<td class="cell col-company" style="text-align:center">${t.company||''}</td>`;
-      b+=`<td class="cell col-responsible" style="text-align:center">${t.responsible||''}</td>`;
-      b+=`<td class="col-status-data"><span class="status-badge status-${sc==='完成'?'done':(sc==='进行中'?'progress':'pending')}">${sc||'待开始'}</span></td>`;
-      b+=`<td class="ms-check" ${canE?`onclick="toggleMs(${t.id})"`:''} title="${canE?'点击切换里程碑':''}">${isMs?'◆':'◇'}</td>`;
+      if(i===0) b+=`<td class="phase-label col-phase" style="position:sticky;left:${getColLeft('phase')}px;z-index:10" rowspan="${items.length}">${pn.replace('阶段','')}</td>`;
+      b+=`<td class="cell col-content" style="position:sticky;left:${getColLeft('content')}px;z-index:10">${t.content}</td>`;
+      b+=`<td class="del-cell col-deliverable" style="position:sticky;left:${getColLeft('deliverable')}px;z-index:10" ${canE?`ondblclick="editTask(${t.id})"`:''} title="${canE?'双击编辑':''}">${isMs?'◆ ':''}${t.deliverable}${showDel?`<div class="row-actions"><button onclick="deleteTask(${t.id})" title="删除">🗑️</button></div>`:''}</td>`;
+      b+=`<td class="cell col-company" style="position:sticky;left:${getColLeft('company')}px;z-index:10;text-align:center">${t.company||''}</td>`;
+      b+=`<td class="cell col-responsible" style="position:sticky;left:${getColLeft('responsible')}px;z-index:10;text-align:center">${t.responsible||''}</td>`;
+      b+=`<td class="col-status-data" style="position:sticky;left:${getColLeft('status')}px;z-index:10"><span class="status-badge status-${sc==='完成'?'done':(sc==='进行中'?'progress':'pending')}">${sc||'待开始'}</span></td>`;
+      b+=`<td class="ms-check" style="position:sticky;left:${getColLeft('milestone')}px;z-index:10" ${canE?`onclick="toggleMs(${t.id})"`:''} title="${canE?'点击切换里程碑':''}">${isMs?'◆':'◇'}</td>`;
 
       // Gantt chart cell
       b+=`<td class="sep-col" colspan="${td+1}" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:32px"><div class="gantt-cell">`;
