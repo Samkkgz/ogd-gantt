@@ -624,11 +624,11 @@ function renderGantt() {
       
       b+=`<tr class="phase-${pClass}${isMs?' phase-milestone':''}">`;
       if(i===0) b+=`<td class="phase-label col-phase fixed-phase" rowspan="${items.length}">${pn.replace('阶段','')}</td>`;
-      b+=`<td class="cell col-content fixed-content">${t.content}</td>`;
+      b+=`<td class="cell col-content fixed-content" ${canE?`ondblclick="editTask(${t.id})"`:""} title="${canE?"双击编辑":""}">${t.content}</td>`;
       b+=`<td class="del-cell col-deliverable fixed-deliverable" ${canE?`ondblclick="editTask(${t.id})"`:''} title="${canE?'双击编辑':''}">${isMs?'◆ ':''}${t.deliverable}${showDel?`<div class="row-actions"><button onclick="deleteTask(${t.id})" title="删除">🗑️</button></div>`:''}</td>`;
-      b+=`<td class="cell col-company fixed-company" style="text-align:center">${t.company||''}</td>`;
-      b+=`<td class="cell col-responsible fixed-responsible" style="text-align:center">${t.responsible||''}</td>`;
-      b+=`<td class="col-status-data fixed-status"><span class="status-badge status-${sc==='完成'?'done':(sc==='进行中'?'progress':'pending')}">${sc||'待开始'}</span></td>`;
+      b+=`<td class="cell col-company fixed-company" ${canE?`ondblclick="editTask(${t.id})"`:""} title="${canE?"双击编辑":""}" style="text-align:center">${t.company||""}</td>`;
+      b+=`<td class="cell col-responsible fixed-responsible" ${canE?`ondblclick="editTask(${t.id})"`:""} title="${canE?"双击编辑":""}" style="text-align:center">${t.responsible||""}</td>`;
+      b+=`<td class="col-status-data fixed-status" ${canE?`ondblclick="editTask(${t.id})"`:""} title="${canE?"双击编辑":""}"><span class="status-badge status-${sc==="完成"?"done":(sc==="进行中"?"progress":"pending")}">${sc||"待开始"}</span></td>`;
       b+=`<td class="ms-check fixed-milestone" ${canE?`onclick="toggleMs(${t.id})"`:''} title="${canE?'点击切换里程碑':''}">${isMs?'◆':'◇'}</td>`;
 
       // Gantt chart cell
@@ -697,19 +697,26 @@ function toggleMsFilter(){msOnly=!msOnly;document.getElementById('msFilter').tex
 // TASK CRUD
 // ============================================================
 async function addTask() {
+  if (!currentUser) return showToast('⛔ 请先登录','error');
   if (!canEdit('嘉顿')&&!canEdit('ECS')) return showToast('⛔ 你没有权限添加任务','error');
-  const { data, error } = await sb.from('tasks').insert({
-    phase:'准备阶段', content:'新任务', deliverable:'双击编辑', company:currentUser.company,
-    responsible:'', status:'', milestone:false
-  }).select().single();
-  if(error) return showToast('❌ 添加失败: '+error.message,'error');
-  tasks.push(data);
-  renderGantt();
-  setTimeout(()=>{
-    const wrapper=document.querySelector('.gantt-wrapper');
-    if(wrapper) wrapper.scrollTop=wrapper.scrollHeight;
-  },100);
-  showToast('➕ 已添加，双击编辑','success');
+  try {
+    const company = currentUser.company || 'ECS';
+    const { data, error } = await sb.from('tasks').insert({
+      phase:'准备阶段', content:'新任务', deliverable:'双击编辑', company:company,
+      responsible:'', status:'', milestone:false
+    }).select().single();
+    if(error) return showToast('❌ 添加失败: '+error.message,'error');
+    if(!data) return showToast('❌ 添加失败: 未返回数据','error');
+    tasks.push(data);
+    renderGantt();
+    setTimeout(()=>{
+      const wrapper=document.querySelector('.gantt-wrapper');
+      if(wrapper) wrapper.scrollTop=wrapper.scrollHeight;
+    },100);
+    showToast('➕ 已添加，双击编辑','success');
+  } catch(e) {
+    showToast('❌ 添加失败: '+e.message,'error');
+  }
 }
 
 async function deleteTask(id) {
