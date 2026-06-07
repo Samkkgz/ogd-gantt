@@ -570,7 +570,11 @@ async function loadTasks() {
 }
 
 async function refreshData() {
+  const wrapper = document.querySelector('.gantt-wrapper');
+  const sx = wrapper ? wrapper.scrollLeft : 0;
+  const sy = wrapper ? wrapper.scrollTop : 0;
   await loadTasks();
+  if (wrapper) { wrapper.scrollLeft = sx; wrapper.scrollTop = sy; }
   showToast('🔄 已刷新','info');
 }
 
@@ -590,6 +594,11 @@ function canDelete() {
 // GANTT RENDER
 // ============================================================
 function renderGantt() {
+  // Save scroll position
+  const _wrapper = document.querySelector('.gantt-wrapper');
+  const _sx = _wrapper ? _wrapper.scrollLeft : 0;
+  const _sy = _wrapper ? _wrapper.scrollTop : 0;
+  
   applyColStyles();
   const data = msOnly ? tasks.filter(t=>t.milestone) : tasks;
   if (!data.length) {
@@ -690,6 +699,8 @@ ${t.responsible?'负责人:'+t.responsible:''}
   updatePermNotice();
   // Re-bind resize handles after DOM update
   setTimeout(initResizeHandles, 0);
+  // Restore scroll position
+  if (_wrapper) { _wrapper.scrollLeft = _sx; _wrapper.scrollTop = _sy; }
 }
 
 function renderMsOverview() {
@@ -922,6 +933,9 @@ async function deleteMember(userId, userName) {
   if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'admin')) 
     return showToast('⛔ 没有权限','error');
   try {
+    // First remove task references (set created_by to null)
+    await sb.from('tasks').update({created_by: null}).eq('created_by', userId);
+    // Then delete the profile
     const { error } = await sb.from('profiles').delete().eq('id', userId);
     if (error) throw error;
     showToast(`🗑️ 已删除成员「${userName||''}」`,'success');
