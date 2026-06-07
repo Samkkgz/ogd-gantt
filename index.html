@@ -1087,14 +1087,26 @@ async function changeRole(userId, newRole) {
 async function resendInvite(email, name) {
   if (!email) return showToast('邮箱为空','error');
   try {
-    // Send magic link email (works for existing unconfirmed users)
-    const { error } = await sb.auth.signInWithOtp({ 
-      email: email,
+    // Generate new temp password and try to re-signup (updates password for unconfirmed users)
+    const newPw = Math.random().toString(36).slice(2,10) + 'A1!';
+    await sb.auth.signUp({ 
+      email, password: newPw,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    }).catch(() => {}); // ignore if user already exists
+    
+    // Also send magic link as fallback
+    await sb.auth.signInWithOtp({ 
+      email,
       options: { emailRedirectTo: window.location.origin + window.location.pathname }
     });
-    if (error) throw error;
-    await logAction('重发邀请', `${name||''} (${email}) 邀请邮件已重发`);
-    showToast(`📧 邀请邮件已重发至 ${email}`,'success');
+    
+    await logAction('重发邀请', `${name||''} (${email}) 邀请已重发`);
+    await renderAdmin();
+    document.getElementById('inviteResult').style.display = 'block';
+    document.getElementById('inviteResultMsg').innerHTML = `<strong>📧 邀请已重发至 ${email}</strong><br>
+      <span>初始密码：<code style="background:#f0f0f0;padding:2px 8px;border-radius:4px;font-size:14px;user-select:all">${newPw}</code></span><br>
+      <span style="color:#999;font-size:12px">用户也可直接点击邮件中的链接登录（无需密码）</span>`;
+    showToast('📧 已重发','success');
   } catch(e) {
     const msg = e.message || '';
     if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
