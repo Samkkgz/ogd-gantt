@@ -888,15 +888,25 @@ async function inviteMember() {
   const company = document.getElementById('inviteCompany').value;
   const role = document.getElementById('inviteRole').value;
   if (!email) return showToast('请输入邮箱','error');
+  if (!name) return showToast('请输入姓名','error');
   
   try {
-    const { error } = await sb.auth.admin.inviteUserByEmail(email, {
-      data: { name, company, role }
+    // Create user - trigger auto-creates profile with name/company/role
+    const { data, error } = await sb.auth.signUp({
+      email: email,
+      password: Math.random().toString(36).slice(2,10) + 'A1!',
+      options: { data: { name, company, role } }
     });
     if (error) throw error;
-    showToast(`📩 邀请已发送给 ${email}`,'success');
+    if (!data?.user) throw new Error('注册失败 - 可能邮箱已被使用');
+    
+    // The database trigger on_auth_user_created creates the profile
+    // with name, company, role from user_metadata
+    
+    showToast(`📧 邀请已发送至 ${email}，请查看邮箱完成注册`,'success');
     document.getElementById('inviteEmail').value='';
     document.getElementById('inviteName').value='';
+    renderAdmin();
   } catch(e) {
     showToast('❌ 邀请失败: '+e.message,'error');
   }
