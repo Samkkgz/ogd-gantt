@@ -489,6 +489,13 @@ async function loadProfile(user) {
     
     showApp();
     await loadTasks();
+    // Restore saved tab after login
+    try {
+      const savedTab = localStorage.getItem('ogd_tab');
+      if (savedTab === 'admin' && (data.role === 'super_admin' || data.role === 'admin')) {
+        switchTab('admin');
+      }
+    } catch(e) {}
   }
 }
 
@@ -510,6 +517,7 @@ function showApp() {
 }
 
 async function switchTab(tab) {
+  try { localStorage.setItem('ogd_tab', tab); } catch(e) {}
   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
   document.getElementById('tabGantt').classList.add('hide');
   document.getElementById('tabAdmin').classList.add('hide');
