@@ -859,7 +859,7 @@ async function renderAdmin() {
       <td>${m.name||'—'}</td>
       <td><span class="user-badge badge-${m.company}">${m.company||'—'}</span></td>
       <td><span class="user-badge badge-${m.role==='super_admin'?'super_admin':(m.role==='admin'?'admin':'')}">${m.role==='super_admin'?'超级管理员':(m.role==='admin'?'管理员':'成员')}</span></td>
-      <td>${canManage&&m.role!=='super_admin'?`<select onchange="changeRole('${m.id}',this.value)"><option value="member" ${m.role==='member'?'selected':''}>成员</option><option value="admin" ${m.role==='admin'?'selected':''}>管理员</option></select>`:'—'}</td>
+      <td>${canManage&&m.role!=='super_admin'?`<select onchange="changeRole('${m.id}',this.value)"><option value="member" ${m.role==='member'?'selected':''}>成员</option><option value="admin" ${m.role==='admin'?'selected':''}>管理员</option></select><button onclick="deleteMember('${m.id}','${m.name||m.email}')" style="margin-left:6px;padding:3px 8px;border:none;border-radius:4px;background:#fff1f0;color:#ff4d4f;cursor:pointer;font-size:11px" title="删除此成员">🗑️</button>`:'—'}</td>
     </tr>`;
   });
   html += '</table></div>';
@@ -916,6 +916,20 @@ async function inviteMember() {
 }
 
 function closeMemberModal() { document.getElementById('memberModal').classList.remove('active'); }
+
+async function deleteMember(userId, userName) {
+  if (!confirm(`确定要删除成员「${userName||userId}」吗？此操作不可撤销。`)) return;
+  if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'admin')) 
+    return showToast('⛔ 没有权限','error');
+  try {
+    const { error } = await sb.from('profiles').delete().eq('id', userId);
+    if (error) throw error;
+    showToast(`🗑️ 已删除成员「${userName||''}」`,'success');
+    renderAdmin();
+  } catch(e) {
+    showToast('❌ 删除失败: '+e.message,'error');
+  }
+}
 
 async function changeRole(userId, newRole) {
   const { error } = await sb.from('profiles').update({role:newRole}).eq('id',userId);
