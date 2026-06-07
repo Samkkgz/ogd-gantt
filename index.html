@@ -277,11 +277,11 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 <div class="modal-overlay" id="editModal">
   <div class="modal">
     <h3>✏️ 编辑任务</h3>
-    <label>产出</label><input id="eDeliverable">
+    <div class="row"><div><label>阶段</label><select id="ePhase"><option value="准备阶段">📋 准备阶段</option><option value="项目实施">🚀 项目实施</option><option value="实施阶段">🔧 实施阶段</option><option value="回顾阶段">📊 回顾阶段</option></select></div><div><label>状态</label><select id="eStatus"><option value="完成">✅ 完成</option><option value="进行中">🔄 进行中</option><option value="">⏳ 待开始</option></select></div></div>
     <div class="row"><div><label>内容</label><input id="eContent"></div><div><label>公司</label><select id="eCompany"><option>嘉顿</option><option>ECS</option><option>嘉顿/ECS</option></select></div></div>
-    <label>负责人</label><input id="eResponsible">
+    <label>产出</label><input id="eDeliverable">
+    <label>负责人</label><select id="eResponsible"><option value="">请选择</option></select>
     <div class="row"><div><label>开始日期</label><input id="eStart" type="date"></div><div><label>结束日期</label><input id="eEnd" type="date"></div></div>
-    <label>状态</label><select id="eStatus"><option value="完成">✅ 完成</option><option value="进行中">🔄 进行中</option><option value="">⏳ 待开始</option></select>
     <div class="cb-row"><input type="checkbox" id="eMilestone"><label for="eMilestone">◆ 标记为里程碑</label></div>
     <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">取消</button><button class="btn-ok" onclick="saveEdit()">保存</button></div>
   </div>
@@ -536,6 +536,28 @@ function showAdminPanel() { switchTab('admin'); }
 // ============================================================
 // DATA OPERATIONS
 // ============================================================
+async function loadUsers() {
+  try {
+    const { data: profiles } = await sb.from('profiles').select('name,company').order('name');
+    if (profiles && profiles.length) {
+      const sel = document.getElementById('eResponsible');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">请选择</option>';
+      const seen = new Set();
+      profiles.forEach(p => {
+        const name = (p.name||'').trim();
+        if (name && !seen.has(name)) {
+          seen.add(name);
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = p.company ? name + ' (' + p.company + ')' : name;
+          sel.appendChild(opt);
+        }
+      });
+    }
+  } catch(e) { /* ignore */ }
+}
+
 async function loadTasks() {
   const { data } = await sb.from('tasks').select('*').order('id');
   if (data) tasks = data;
@@ -745,17 +767,37 @@ function editTask(id) {
   document.getElementById('eDeliverable').value=t.deliverable;
   document.getElementById('eContent').value=t.content;
   document.getElementById('eCompany').value=t.company||'嘉顿';
-  document.getElementById('eResponsible').value=t.responsible||'';
   document.getElementById('eStart').value=t.start_date||'';
   document.getElementById('eEnd').value=t.end_date||'';
   document.getElementById('eStatus').value=t.status||'';
   document.getElementById('eMilestone').checked=!!t.milestone;
+  // Phase dropdown
+  const phaseSel = document.getElementById('ePhase');
+  if (phaseSel) phaseSel.value = t.phase || '准备阶段';
+  // Load users and set responsible
+  loadUsers().then(() => {
+    const respSel = document.getElementById('eResponsible');
+    if (respSel && t.responsible) {
+      // Try to find exact match, otherwise add as custom option
+      const found = Array.from(respSel.options).some(opt => opt.value === t.responsible);
+      if (found) {
+        respSel.value = t.responsible;
+      } else {
+        const opt = document.createElement('option');
+        opt.value = t.responsible;
+        opt.textContent = t.responsible + ' (自定义)';
+        respSel.appendChild(opt);
+        respSel.value = t.responsible;
+      }
+    }
+  });
   document.getElementById('editModal').classList.add('active');
 }
 
 async function saveEdit() {
   if(editIdx<0) return;
   const updates={
+    phase:document.getElementById('ePhase').value,
     deliverable:document.getElementById('eDeliverable').value,
     content:document.getElementById('eContent').value,
     company:document.getElementById('eCompany').value,
