@@ -960,7 +960,7 @@ async function inviteMember() {
         });
         if (pe) {
           const fkMsg = pe.message && pe.message.includes('foreign key') 
-            ? '该邮箱已在auth系统但档案创建失败，请先在Supabase后台确认该用户是否存在'
+            ? '该邮箱已在认证系统但ID不匹配。请在Supabase → Authentication → Users 找到该邮箱, 复制其UUID, 然后在SQL Editor运行:\nINSERT INTO profiles (id, email, name, company, role, status) VALUES (\'' + "'该UUID'" + '\', \'' + email + '\', \'' + name + '\', \'' + company + '\', \'' + role + '\', \'pending\');'
             : pe.message || JSON.stringify(pe);
           throw new Error(fkMsg);
         }
@@ -1020,7 +1020,7 @@ async function inviteMember() {
     if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
       showToast('❌ 邀请失败: ' + msg + ' — 需在Supabase后台→Authentication→Settings配置SMTP邮件服务','error');
     else if (msg.includes('foreign key'))
-      showToast('❌ 邀请失败: 该邮箱在认证系统有记录但档案创建失败。详情: ' + msg,'error');
+      showToast('❌ 邀请失败: ' + msg,'error');
     else if (msg.includes('column') || msg.includes('relation') || msg.includes('does not exist'))
       showToast('❌ 邀请失败: 数据库缺少字段，请先运行迁移脚本。' + msg,'error');
     else
