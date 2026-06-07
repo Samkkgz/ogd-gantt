@@ -44,7 +44,7 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 .user-info button:hover{background:#f5f5f5}
 
 /* Tab bar */
-.tab-bar{display:flex;gap:0;background:#fff;border-bottom:1px solid #e8e8e8;padding:0 20px}
+.tab-bar{display:flex;background:#fff;border-bottom:1px solid #e8e8e8;padding:0 20px}
 .tab-bar button{padding:10px 20px;border:none;background:none;cursor:pointer;font-size:13px;color:#666;border-bottom:2px solid transparent;transition:all .2s}
 .tab-bar button:hover{color:#1890ff}
 .tab-bar button.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:600}
@@ -56,15 +56,43 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 .permission-notice{background:#fff7e6;border:1px solid #ffe58f;border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .permission-notice .p-badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
 
-/* Gantt wrapper */
+/* Toolbar */
+.toolbar{display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap}
+.toolbar button{padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;transition:all .2s;white-space:nowrap}
+.toolbar button:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.tb-primary{background:#1890ff;color:#fff}
+.tb-success{background:#52c41a;color:#fff}
+.tb-danger{background:#ff4d4f;color:#fff}
+.tb-ghost{background:#f0f0f0;color:#555}
+.tb-ghost:hover{background:#d9d9d9}
+.tb-sep{width:1px;height:24px;background:#e0e0e0;margin:0 4px;flex-shrink:0}
+.legend{display:flex;gap:10px;font-size:11px;align-items:center;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:3px}
+.lc{width:14px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* Milestone overview */
+.ms-bar{background:linear-gradient(135deg,#fff0f6,#f9f0ff);border:1px solid #ffadd2;border-radius:10px;padding:10px 14px;margin-bottom:12px}
+.ms-bar h3{font-size:13px;color:#eb2f96;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.ms-timeline{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px}
+.ms-item{display:flex;flex-direction:column;align-items:center;min-width:64px;max-width:78px;cursor:pointer;padding:3px 5px;border-radius:6px;flex-shrink:0;transition:background .2s}
+.ms-item:hover{background:rgba(235,47,150,.06)}
+.ms-diamond{font-size:14px;line-height:1}
+.ms-date{font-size:9px;color:#999;margin-top:1px}
+.ms-label{font-size:10px;color:#333;text-align:center;line-height:1.2;font-weight:500;margin-top:1px}
+.ms-phase{font-size:8px;color:#aaa}
+
+/* === GANTT TABLE === */
 .gantt-wrapper{overflow:auto;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.08);max-height:70vh;background:#fff}
 .gantt-wrapper table{border-collapse:separate;border-spacing:0;font-size:13px;min-width:1000px}
 .gantt-wrapper th,.gantt-wrapper td{border:1px solid #e8e8e8;padding:0;vertical-align:middle;position:relative}
-.gantt-wrapper th{background:#fafafa;font-weight:600;font-size:12px;color:#555;text-align:center;position:sticky;top:0;z-index:20}
-.date-header th{background:#e6f0ff;font-size:11px;color:#333;border-bottom:2px solid #91d5ff;padding:4px 2px}
+.gantt-wrapper th{background:#fafafa;font-weight:600;font-size:12px;color:#555;text-align:center}
+
+/* === HEADER FREEZE (vertical) === */
+.gantt-wrapper th{position:sticky;top:0;z-index:20;background:#fafafa}
+.date-header th{background:#e6f0ff;padding:4px 2px;font-size:11px;color:#333;border-bottom:2px solid #91d5ff}
 .date-header+tr th{top:30px}
 
-/* Frozen columns */
+/* === FROZEN COLUMNS (horizontal) - Table level === */
 .frozen-cols td{position:sticky;z-index:10}
 .frozen-cols td:first-child{left:0;z-index:11}
 .frozen-cols td:nth-child(2){left:65px}
@@ -84,51 +112,67 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 .frozen-cols th:nth-child(7){left:505px;z-index:31}
 .frozen-cols th:nth-child(8){left:540px;z-index:31;border-right:2px solid #91d5ff}
 
-/* Phase colors */
-.phase-prep td{background:#f6ffed}
-.phase-launch td{background:#fff7e6}
-.phase-exec td{background:#e6f7ff}
-.phase-review td{background:#f9f0ff}
-.phase-milestone td{background:#fff0f6}
-.phase-label{font-weight:700;writing-mode:vertical-lr;letter-spacing:4px;font-size:13px;text-align:center;padding:8px 4px;min-height:60px}
-.phase-prep .phase-label{background:#d9f7be;color:#237804}
-.phase-launch .phase-label{background:#ffe58f;color:#ad6800}
-.phase-exec .phase-label{background:#91d5ff;color:#003a8c}
-.phase-review .phase-label{background:#d3adf7;color:#391063}
-.phase-milestone .phase-label{background:#ffadd2;color:#eb2f96}
+/* Separator after frozen columns */
+.gantt-wrapper td:nth-child(8){border-right:2px solid #91d5ff}
+.gantt-wrapper th:nth-child(8){border-right:2px solid #91d5ff}
 
+/* === ROW COLORS === */
+tr.phase-prep td{background:#f6ffed}
+tr.phase-launch td{background:#fff7e6}
+tr.phase-exec td{background:#e6f7ff}
+tr.phase-review td{background:#f9f0ff}
+tr.phase-milestone td{background:#fff0f6}
+
+/* === FROZEN CELL BACKGROUNDS (must be explicit for sticky to show) === */
+.phase-label{font-weight:700;writing-mode:vertical-lr;letter-spacing:4px;font-size:13px;text-align:center;padding:8px 4px;min-height:60px}
+tr.phase-prep td.phase-label{background:#d9f7be;color:#237804}
+tr.phase-launch td.phase-label{background:#ffe58f;color:#ad6800}
+tr.phase-exec td.phase-label{background:#91d5ff;color:#003a8c}
+tr.phase-review td.phase-label{background:#d3adf7;color:#391063}
+tr.phase-milestone td.phase-label{background:#ffadd2;color:#eb2f96}
+
+/* All frozen cell types get explicit backgrounds */
+tr.phase-prep td.cell,tr.phase-prep td.del-cell,tr.phase-prep td.ms-cell,tr.phase-prep td:nth-child(6),tr.phase-prep td:nth-child(8){background:#f6ffed}
+tr.phase-launch td.cell,tr.phase-launch td.del-cell,tr.phase-launch td.ms-cell,tr.phase-launch td:nth-child(6),tr.phase-launch td:nth-child(8){background:#fff7e6}
+tr.phase-exec td.cell,tr.phase-exec td.del-cell,tr.phase-exec td.ms-cell,tr.phase-exec td:nth-child(6),tr.phase-exec td:nth-child(8){background:#e6f7ff}
+tr.phase-review td.cell,tr.phase-review td.del-cell,tr.phase-review td.ms-cell,tr.phase-review td:nth-child(6),tr.phase-review td:nth-child(8){background:#f9f0ff}
+tr.phase-milestone td.cell,tr.phase-milestone td.del-cell,tr.phase-milestone td.ms-cell,tr.phase-milestone td:nth-child(6),tr.phase-milestone td:nth-child(8){background:#fff0f6}
+
+/* Row hover effect */
+tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cell{filter:brightness(0.97)}
+
+/* === CELL TYPES === */
 .cell{padding:5px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.del-cell{cursor:default;padding:5px}
-.del-cell:hover{background:#f0f0f0}
+.del-cell{cursor:default;padding:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.del-cell:hover{background:#f0f0f0!important}
+.ms-cell{text-align:center;padding:4px;cursor:pointer;font-size:15px;line-height:1}
+
+/* Status badges */
 .status-badge{padding:1px 7px;border-radius:10px;font-size:11px;white-space:nowrap;display:inline-block}
 .status-done{background:#d9f7be;color:#237804}
 .status-progress{background:#fff7b3;color:#ad6800}
 .status-pending{background:#f0f0f0;color:#999}
 
+/* === TASK BARS === */
 .gantt-cell{position:relative;height:32px;min-width:100%}
 .task-bar{position:absolute;height:20px;border-radius:4px;top:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.1);transition:all .15s}
 .task-bar:hover{filter:brightness(1.1);transform:translateY(-1px)}
-.bar-milestone{background:linear-gradient(135deg,#eb2f96,#722ed1)!important}
+.bar-milestone{background:linear-gradient(135deg,#eb2f96,#722ed1)!important;box-shadow:0 1px 4px rgba(235,47,150,.3);border:1px solid rgba(235,47,150,.3)}
 .bar-milestone::before{content:"◆ ";font-size:9px}
-.bar-ready{background:#52c41a}
-.bar-active{background:#faad14}
-.bar-wait{background:#bfbfbf}
-.bar-plan{background:#52c41a}
-.bar-start{background:#faad14}
-.bar-do{background:#1890ff}
-.bar-review{background:#722ed1}
+
+/* Today line */
 .today-line{position:absolute;top:0;bottom:0;width:2px;background:#ff4d4f;z-index:5;pointer-events:none}
 .today-label{position:absolute;top:-24px;left:50%;transform:translateX(-50%);font-size:9px;color:#ff4d4f;white-space:nowrap}
 
+/* Row actions (delete button) */
 .row-actions{position:absolute;right:2px;top:2px;opacity:0;transition:opacity .2s;z-index:15}
 .del-cell:hover .row-actions,.ms-cell:hover .row-actions{opacity:1}
 .row-actions button{background:none;border:none;cursor:pointer;font-size:13px;color:#ff4d4f;padding:2px;line-height:1;border-radius:3px}
 .row-actions button:hover{background:#fff1f0}
 
-/* Admin Panel */
+/* === ADMIN PANEL === */
 .admin-section{background:#fff;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:20px;margin-bottom:16px}
 .admin-section h2{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.admin-section h2 .badge{font-size:11px;padding:2px 8px;border-radius:4px}
 .member-table{width:100%;border-collapse:collapse;font-size:13px}
 .member-table th,.member-table td{padding:8px 12px;border:1px solid #e8e8e8;text-align:left}
 .member-table th{background:#fafafa;font-weight:600;font-size:12px;color:#555}
@@ -139,32 +183,7 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 .invite-form button{padding:8px 16px;background:#1890ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
 .invite-form button:hover{background:#40a9ff}
 
-/* Milestone overview */
-.ms-bar{background:linear-gradient(135deg,#fff0f6,#f9f0ff);border:1px solid #ffadd2;border-radius:10px;padding:10px 14px;margin-bottom:12px}
-.ms-bar h3{font-size:13px;color:#eb2f96;margin-bottom:6px;display:flex;align-items:center;gap:6px}
-.ms-timeline{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px}
-.ms-item{display:flex;flex-direction:column;align-items:center;min-width:64px;max-width:78px;cursor:pointer;padding:3px 5px;border-radius:6px;flex-shrink:0;transition:background .2s}
-.ms-item:hover{background:rgba(235,47,150,.06)}
-.ms-diamond{font-size:14px;line-height:1}
-.ms-date{font-size:9px;color:#999;margin-top:1px}
-.ms-label{font-size:10px;color:#333;text-align:center;line-height:1.2;font-weight:500;margin-top:1px}
-.ms-phase{font-size:8px;color:#aaa}
-
-/* Tool bar */
-.toolbar{display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap}
-.toolbar button{padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;transition:all .2s;white-space:nowrap}
-.toolbar button:hover{filter:brightness(1.1);transform:translateY(-1px)}
-.tb-primary{background:#1890ff;color:#fff}
-.tb-success{background:#52c41a;color:#fff}
-.tb-danger{background:#ff4d4f;color:#fff}
-.tb-ghost{background:#f0f0f0;color:#555}
-.tb-ghost:hover{background:#d9d9d9}
-.tb-sep{width:1px;height:24px;background:#e0e0e0;margin:0 4px;flex-shrink:0}
-.legend{display:flex;gap:10px;font-size:11px;align-items:center;flex-wrap:wrap}
-.legend-item{display:flex;align-items:center;gap:3px}
-.lc{width:14px;height:10px;border-radius:2px;flex-shrink:0}
-
-/* Modal */
+/* === MODAL === */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;justify-content:center;align-items:center}
 .modal-overlay.active{display:flex}
 .modal{background:#fff;border-radius:12px;padding:24px;min-width:420px;max-width:500px;box-shadow:0 8px 32px rgba(0,0,0,.15);margin:20px;max-height:90vh;overflow-y:auto}
@@ -184,25 +203,15 @@ body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;backgr
 .btn-cancel{background:#f0f0f0;color:#555}
 .btn-cancel:hover{background:#d9d9d9}
 
+/* === TOAST === */
 .toast{position:fixed;top:16px;right:16px;z-index:2000;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transform:translateY(-10px);transition:all .3s;pointer-events:none;max-width:360px}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast-info{background:#1890ff;color:#fff}
 .toast-success{background:#52c41a;color:#fff}
 .toast-error{background:#ff4d4f;color:#fff}
 
-@media print{.tab-bar,.toolbar,.user-info button,.permission-notice{display:none}}
-
-/* Ensure frozen cells have proper backgrounds */
-.phase-prep td.phase-label{background:#d9f7be}
-.phase-launch td.phase-label{background:#ffe58f}
-.phase-exec td.phase-label{background:#91d5ff}
-.phase-review td.phase-label{background:#d3adf7}
-.phase-milestone td.phase-label{background:#ffadd2}
-.phase-prep .del-cell,.phase-prep .cell,.phase-prep .ms-cell{background:#f6ffed}
-.phase-launch .del-cell,.phase-launch .cell,.phase-launch .ms-cell{background:#fff7e6}
-.phase-exec .del-cell,.phase-exec .cell,.phase-exec .ms-cell{background:#e6f7ff}
-.phase-review .del-cell,.phase-review .cell,.phase-review .ms-cell{background:#f9f0ff}
-.phase-milestone .del-cell,.phase-milestone .cell,.phase-milestone .ms-cell{background:#fff0f6}
+.file-input-hidden{display:none}
+@media print{.tab-bar,.toolbar,.user-info button,.permission-notice,.ms-bar{display:none}}
 </style>
 </head>
 <body>
