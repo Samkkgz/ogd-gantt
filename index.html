@@ -856,6 +856,18 @@ async function renderAdmin() {
   }
   const isSuper = currentUser.role === "super_admin";
   const isAdmin = currentUser.role === "admin";
+  
+  // Fetch all unique companies for super admin invite form
+  let companies = [];
+  if (isSuper) {
+    try {
+      const { data: profileCos } = await sb.from('profiles').select('company').not('company', 'is', null);
+      const { data: taskCos } = await sb.from('tasks').select('company').not('company', 'is', null);
+      const allCos = new Set();
+      [...(profileCos||[]), ...(taskCos||[])].forEach(c => { if(c.company && c.company.trim()) allCos.add(c.company.trim()); });
+      companies = [...allCos].sort();
+    } catch(e) { companies = []; }
+  }
 
   
   let html = '';
@@ -866,8 +878,8 @@ async function renderAdmin() {
       <input type="email" id="inviteEmail" placeholder="邮箱" style="width:200px">
       <input type="text" id="inviteName" placeholder="姓名" style="width:140px">
       <select id="inviteCompany" ${isSuper?'':'disabled'}>
-        <option value="${currentUser.company}">${currentUser.company}</option>
-        ${isSuper?'<option value="ECS">ECS</option><option value="嘉顿">嘉顿</option>':''}
+        ${isSuper ? companies.map(c => `<option value="${c}" ${c===currentUser.company?'selected':''}>${c}</option>`).join('') 
+                  : `<option value="${currentUser.company}">${currentUser.company}</option>`}
       </select>
       <select id="inviteRole"><option value="member">成员</option><option value="admin">团队管理员</option></select>
       <button onclick="inviteMember()">📩 发送邀请</button>
