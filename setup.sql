@@ -1,5 +1,5 @@
 -- ============================================================
--- 🚀 OGD 甘特图 - 一键设置脚本
+-- 🚀 OGD 甘特图 - 一键设置脚本（含 status 列和 RPC 函数）
 -- 复制整个文件内容，粘贴到 Supabase SQL Editor 运行
 -- ============================================================
 
@@ -19,8 +19,9 @@ CREATE TABLE profiles (
   id UUID REFERENCES auth.users PRIMARY KEY,
   email TEXT,
   name TEXT,
-  company TEXT CHECK (company IN ('ECS', '嘉顿', 'admin')),
+  company TEXT,
   role TEXT CHECK (role IN ('member', 'admin', 'super_admin')),
+  status TEXT DEFAULT 'active',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -54,19 +55,21 @@ CREATE TABLE activity_log (
 -- 2. 自动创建用户档案
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, name, company, role)
+  INSERT INTO public.profiles (id, email, name, company, role, status)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
     COALESCE(NEW.raw_user_meta_data->>'company', ''),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'member')
+    COALESCE(NEW.raw_user_meta_data->>'role', 'member'),
+    'active'
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
@@ -92,6 +95,38 @@ CREATE POLICY "profiles_update_company_admin" ON profiles FOR UPDATE
   USING (EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.company = profiles.company))
   WITH CHECK (EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.company = profiles.company));
 
+-- ============================================================
+-- 4b. RPC 函数（绕过 RLS 的管理操作）
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION admin_create_profile(
+  p_id UUID, p_email TEXT, p_name TEXT, p_company TEXT, p_role TEXT
+)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+BEGIN
+  INSERT INTO profiles (id, email, name, company, role, status)
+  VALUES (p_id, p_email, p_name, p_company, p_role, 'pending')
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    name = EXCLUDED.name,
+    company = EXCLUDED.company,
+    role = EXCLUDED.role;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION admin_update_user_status(
+  user_id UUID, new_status TEXT
+)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE profiles SET status = new_status WHERE id = user_id;
+END;
+$$;
+
 -- --- 任务策略 ---
 CREATE POLICY "tasks_read_all" ON tasks FOR SELECT USING (true);
 CREATE POLICY "tasks_all_super" ON tasks FOR ALL
@@ -109,6 +144,9 @@ CREATE POLICY "tasks_member_insert" ON tasks FOR INSERT
 -- ============================================================
 -- 5. 初始种子数据（36项任务）
 -- ============================================================
+
+-- 先清理已存在数据避免重复
+DELETE FROM tasks;
 
 INSERT INTO tasks (phase, content, deliverable, company, responsible, start_date, end_date, status, milestone) VALUES
 ('准备阶段', '业务机会分析', '确定目标城市', '嘉顿', 'Lori', '2026-06-02', '2026-06-02', '完成', TRUE),
@@ -152,3 +190,4 @@ INSERT INTO tasks (phase, content, deliverable, company, responsible, start_date
 SELECT setval('tasks_id_seq', (SELECT MAX(id) FROM tasks));
 SELECT '✅ 数据库设置完成！' as 状态;
 SELECT COUNT(*) || ' 条任务已导入' as 结果 FROM tasks;
+SELECT COUNT(*) || ' 个用户档案已就绪' as 用户 FROM profiles;

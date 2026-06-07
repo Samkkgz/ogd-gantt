@@ -333,6 +333,7 @@ const sb = SUPABASE_URL ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 let currentUser = null;      // { id, email, name, company, role }
 let tasks = [];
 let editIdx = -1;
+let members = [];
 let msOnly = false;
 const CELL_W = 34;
 const PHASE_ORDER = ["准备阶段","项目实施","实施阶段","回顾阶段"];
@@ -527,7 +528,7 @@ function showApp() {
   document.getElementById('appMain').classList.remove('hide');
 }
 
-function switchTab(tab) {
+async function switchTab(tab) {
   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
   document.getElementById('tabGantt').classList.add('hide');
   document.getElementById('tabAdmin').classList.add('hide');
@@ -537,7 +538,7 @@ function switchTab(tab) {
   } else {
     document.getElementById('adminTabBtn').classList.add('active');
     document.getElementById('tabAdmin').classList.remove('hide');
-    renderAdmin();
+    await renderAdmin();
   }
 }
 
@@ -843,12 +844,15 @@ function closeModal() { document.getElementById('editModal').classList.remove('a
 // ADMIN PANEL
 // ============================================================
 async function renderAdmin() {
-  // Always fetch fresh profile data
-  const { data: freshMembers } = await sb.from('profiles').select('*').order('created_at', { ascending: false, nullsFirst: false });
-  if (freshMembers) members = freshMembers;
-  const isSuper = currentUser.role === 'super_admin';
-  const isAdmin = currentUser.role === 'admin';
-  const { data: members } = await sb.from('profiles').select('*').order('created_at');
+  try {
+    members = (await sb.from("profiles").select("*").order("created_at")).data || [];
+  } catch(e) {
+    console.error("Failed to fetch members:", e);
+    members = [];
+  }
+  const isSuper = currentUser.role === "super_admin";
+  const isAdmin = currentUser.role === "admin";
+
   
   let html = '';
   
@@ -871,7 +875,9 @@ async function renderAdmin() {
     <table class="member-table">
       <tr><th>邮箱</th><th>姓名</th><th>团队</th><th>角色</th><th>状态</th><th>操作</th></tr>`;
   
-  if(members) members.forEach(m => {
+  if(!members || members.length===0) {
+    html += '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px">暂无团队成员。请使用上方邀请功能添加成员。</td></tr>';
+  } else members.forEach(m => {
     const canManage = isSuper || (isAdmin && m.company === currentUser.company);
     const st = m.status||'active';
     const stLabel = st==='pending'?'⏳ 待确认':(st==='disabled'?'🔴 关闭':'🟢 正常');
@@ -889,7 +895,7 @@ async function renderAdmin() {
         </select>
         <select onchange="changeUserStatus('${m.id}',this.value)" style="margin-right:4px">
           <option value="active" ${st==='active'?'selected':''}>🟢 正常</option>
-          ${st==='pending'?'<option value="pending" selected>⏳ 待确认</option>':''}
+          <option value="pending" ${st==="pending"?"selected":""}>⏳ 待确认</option>
           <option value="disabled" ${st==='disabled'?'selected':''}>🔴 关闭</option>
         </select>
       `:'—'}</td>
@@ -972,7 +978,7 @@ async function inviteMember() {
     
     document.getElementById('inviteEmail').value='';
     document.getElementById('inviteName').value='';
-    renderAdmin();
+    await renderAdmin();
   } catch(e) {
     showToast('❌ 邀请失败: '+e.message,'error');
   }
@@ -995,7 +1001,7 @@ async function changeUserStatus(userId, newStatus) {
     const label = newStatus==='active'?'正常':(newStatus==='disabled'?'关闭':'待确认');
     await logAction('变更用户状态', `用户ID:${userId} -> ${label}`);
     showToast(`✅ 状态已变更为「${label}」`,'success');
-    renderAdmin();
+    await renderAdmin();
   } catch(e) {
     showToast('❌ 变更失败: '+e.message,'error');
   }
@@ -1007,7 +1013,7 @@ async function changeRole(userId, newRole) {
   else {
     const label = newRole==='admin'?'管理员':'成员';
     await logAction('变更角色', `用户ID:${userId} -> ${label}`);
-    showToast('✅ 角色已更新','success'); renderAdmin();
+    showToast('✅ 角色已更新','success'); await renderAdmin();
   }
 }
 
