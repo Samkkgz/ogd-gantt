@@ -390,6 +390,8 @@ function saveColWidths() {
 // ============================================================
 let filters = {};
 let filterTimer = null;
+let inviteCooldown = 0; // OTP rate limit cooldown (seconds)
+let inviteCooldownTimer = null;
 
 function getFilterOptions(field) {
   const vals = new Set();
@@ -900,7 +902,7 @@ async function renderAdmin() {
                   : `<option value="${currentUser.company}">${currentUser.company}</option>`}
       </select>
       <select id="inviteRole"><option value="member">成员</option><option value="admin">团队管理员</option></select>
-      <button onclick="inviteMember()">📩 发送邀请</button>
+      <button id="inviteBtn" onclick="inviteMember()">📩 发送邀请</button>
     </div>
     <div id="inviteResult" style="display:none;margin-top:8px;padding:10px 14px;background:#f6ffed;border:1px solid #b7eb8f;border-radius:8px;font-size:13px;line-height:1.8">
       <div id="inviteResultMsg"></div>
@@ -935,7 +937,7 @@ async function renderAdmin() {
           <option value="pending" ${st==="pending"?"selected":""}>⏳ 待确认</option>
           <option value="disabled" ${st==='disabled'?'selected':''}>🔴 关闭</option>
         </select>
-        ${st==='pending'?`<button onclick="resendInvite('${m.email}','${m.name}')" style="padding:2px 8px;font-size:11px;border:1px solid #1890ff;background:#e6f7ff;color:#1890ff;border-radius:4px;cursor:pointer">📧 重发</button>`:''}
+        ${st==='pending'?`<button id="resendBtn_${m.email.replace(/[.@]/g,'_')}" onclick="resendInvite('${m.email}','${m.name}')" style="padding:2px 8px;font-size:11px;border:1px solid #1890ff;background:#e6f7ff;color:#1890ff;border-radius:4px;cursor:pointer">📧 重发</button>`:''}
       `:'—'}</td>
     </tr>`;
   });
@@ -981,6 +983,7 @@ async function inviteMember() {
   const role = document.getElementById('inviteRole').value;
   if (!email) return showToast('请输入邮箱','error');
   if (!name) return showToast('请输入姓名','error');
+  if (inviteCooldown > 0) return showToast('⏳ 请等待 ' + inviteCooldown + ' 秒后再试','error');
   
   try {
     // Helper: create or update profile via RPC (bypasses RLS)
@@ -1065,6 +1068,20 @@ async function inviteMember() {
     
     document.getElementById('inviteEmail').value='';
     document.getElementById('inviteName').value='';
+    // Start 60s cooldown for OTP rate limit
+    inviteCooldown = 60;
+    const btn = document.getElementById('inviteBtn');
+    if (btn) btn.disabled = true;
+    if (inviteCooldownTimer) clearInterval(inviteCooldownTimer);
+    inviteCooldownTimer = setInterval(() => {
+      inviteCooldown--;
+      if (btn) btn.textContent = '⏳ ' + inviteCooldown + 's';
+      if (inviteCooldown <= 0) {
+        clearInterval(inviteCooldownTimer);
+        inviteCooldownTimer = null;
+        if (btn) { btn.disabled = false; btn.textContent = '📩 发送邀请'; }
+      }
+    }, 1000);
     await renderAdmin();
     // Show invite result after renderAdmin (so it's not wiped)
     if (window._inviteEmail) {
@@ -1077,10 +1094,23 @@ async function inviteMember() {
   } catch(e) {
     const msg = e.message || '';
     if (msg.includes('security purposes') || msg.includes('seconds') || msg.includes('rate') || msg.includes('too many')) {
-      // Try to extract wait seconds from error like "after 47 seconds"
       const secMatch = msg.match(/(\d+)\s*seconds/);
       const waitSec = secMatch ? parseInt(secMatch[1]) + 5 : 60;
       showToast('⏳ 发送太频繁，请等待 ' + waitSec + ' 秒后再试','error');
+      // Start cooldown timer
+      inviteCooldown = waitSec;
+      const btn = document.getElementById('inviteBtn');
+      if (btn) btn.disabled = true;
+      if (inviteCooldownTimer) clearInterval(inviteCooldownTimer);
+      inviteCooldownTimer = setInterval(() => {
+        inviteCooldown--;
+        if (btn) btn.textContent = '⏳ ' + inviteCooldown + 's';
+        if (inviteCooldown <= 0) {
+          clearInterval(inviteCooldownTimer);
+          inviteCooldownTimer = null;
+          if (btn) { btn.disabled = false; btn.textContent = '📩 发送邀请'; }
+        }
+      }, 1000);
     }
     else if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
       showToast('❌ 邀请失败: ' + msg + ' — 需在Supabase后台→Authentication→Settings配置SMTP邮件服务','error');
@@ -1127,6 +1157,7 @@ async function changeRole(userId, newRole) {
 
 async function resendInvite(email, name) {
   if (!email) return showToast('邮箱为空','error');
+  if (inviteCooldown > 0) return showToast('⏳ 请等待 ' + inviteCooldown + ' 秒后再试','error');
   try {
     // Send login link (OTP magic link - no password/confirmation needed)
     const { error } = await sb.auth.signInWithOtp({ 
@@ -1141,6 +1172,21 @@ async function resendInvite(email, name) {
     document.getElementById('inviteResultMsg').innerHTML = `<strong>📧 登录链接已重发至 ${email}</strong><br>
       <span style="color:#999;font-size:12px">用户点击邮件中的链接即可直接登录，登录后可点击右上角「改密」设置密码</span>`;
     showToast('📧 已重发','success');
+    // Start cooldown for OTP rate limit
+    const btnId = 'resendBtn_' + email.replace(/[.@]/g, '_');
+    const rBtn = document.getElementById(btnId);
+    inviteCooldown = 60;
+    if (rBtn) rBtn.disabled = true;
+    if (inviteCooldownTimer) clearInterval(inviteCooldownTimer);
+    inviteCooldownTimer = setInterval(() => {
+      inviteCooldown--;
+      if (rBtn) rBtn.textContent = '⏳ ' + inviteCooldown + 's';
+      if (inviteCooldown <= 0) {
+        clearInterval(inviteCooldownTimer);
+        inviteCooldownTimer = null;
+        if (rBtn) { rBtn.disabled = false; rBtn.textContent = '📧 重发'; }
+      }
+    }, 1000);
   } catch(e) {
     const msg = e.message || '';
     if (msg.includes('security purposes') || msg.includes('seconds') || msg.includes('rate') || msg.includes('too many')) {
