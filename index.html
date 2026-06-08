@@ -135,7 +135,7 @@ tr.phase-milestone td.cell,tr.phase-milestone td.del-cell,tr.phase-milestone td.
 /* Row hover effect on frozen cells */
 tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cell,tr:hover td.col-status-data{filter:brightness(0.97)}
 /* Filter row */
-.filter-row th{position:sticky;top:37px;z-index:30;background:#fff;padding:3px 2px;border-bottom:2px solid #91d5ff}
+.filter-row th{position:sticky;top:24px;z-index:30;background:#fff;padding:2px 2px;border-bottom:2px solid #91d5ff}
 .filter-row input,.filter-row select{width:calc(100% - 4px);padding:2px 4px;border:1px solid #d9d9d9;border-radius:4px;font-size:11px;margin:0 1px;box-sizing:border-box}
 .filter-row input:focus,.filter-row select:focus{border-color:#1890ff;outline:none}
 .filter-row select{background:#fff;cursor:pointer}
@@ -643,18 +643,7 @@ function renderGantt() {
   mgs.forEach((mg,i)=>{const sp=(i<mgs.length-1?mgs[i+1].startIdx:td+1)-mg.startIdx;h+=`<div style="flex:${sp};text-align:center;padding:4px 0;font-weight:700;color:#1890ff;font-size:12px;border-right:1px solid #e6f0ff">${mg.label}</div>`;});
   h+=`</div></th></tr>`;
 
-  // === Build header row 2 (days) ===
-  h+=`<tr class="date-header"><th colspan="7" class="sep-col header-shim" style="border-right:2px solid #91d5ff"></th>`;
-  cur=new Date(mn);
-  for(let i=0;i<=td;i++){
-    const day=cur.getDay(),we=day===0||day===6;
-    const it=new Date().toDateString()===cur.toDateString();
-    h+=`<th style="${we?'color:#bbb':''}${it?'background:#fff1f0;color:#ff4d4f;font-weight:700':''}width:${CELL_W}px;min-width:${CELL_W}px;padding:3px 0;font-size:10px">${cur.getDate()}</th>`;
-    cur.setDate(cur.getDate()+1);
-  }
-  h+='</tr>';
-  
-  // === Filter row (row 3) ===
+  // === Filter row (row 2) ===
   h += '<tr class="filter-row">';
   COL_DEFS.forEach(c => {
     const fid = 'filter_' + c.id;
@@ -663,21 +652,33 @@ function renderGantt() {
     if (c.id === 'phase' || c.id === 'company' || c.id === 'status') {
       // Dropdown filter
       const opts = getFilterOptions(c.id);
-      h += `<th class="col-${c.id}"><select id="${fid}" onchange="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}"><option value="">全部</option>`;
+      h += `<th class="col-${c.id}" style="top:24px"><select id="${fid}" onchange="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}"><option value="">全部</option>`;
       opts.forEach(o => h += `<option value="${o}" ${fv===o?'selected':''}>${o}</option>`);
       h += '</select></th>';
     } else if (c.id === 'milestone') {
-      h += `<th class="col-${c.id}"><select id="${fid}" onchange="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}">
+      h += `<th class="col-${c.id}" style="top:24px"><select id="${fid}" onchange="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}">
         <option value="">全部</option><option value="yes" ${fv==='yes'?'selected':''}>◆ 是</option><option value="no" ${fv==='no'?'selected':''}>◇ 否</option>
       </select></th>`;
     } else {
       // Text filter
-      h += `<th class="col-${c.id}"><input id="${fid}" placeholder="筛选..." value="${fv}" oninput="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}"></th>`;
+      h += `<th class="col-${c.id}" style="top:24px"><input id="${fid}" placeholder="筛选..." value="${fv}" oninput="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}"></th>`;
     }
   });
   // Empty cells for gantt area
-  h += `<th colspan="${td+1}" style="padding:0;border-left:2px solid #91d5ff;background:#f5f7fa"></th>`;
+  h += `<th colspan="${td+1}" style="padding:0;border-left:2px solid #91d5ff;background:#f5f7fa;top:24px"></th>`;
   h += '</tr>';
+  
+
+  // === Build header row 2 (days) ===
+  h+=`<tr class="date-header"><th colspan="7" class="sep-col header-shim" style="border-right:2px solid #91d5ff;top:48px"></th>`;
+  cur=new Date(mn);
+  for(let i=0;i<=td;i++){
+    const day=cur.getDay(),we=day===0||day===6;
+    const it=new Date().toDateString()===cur.toDateString();
+    h+=`<th style="${we?'color:#bbb':''}${it?'background:#fff1f0;color:#ff4d4f;font-weight:700':''}width:${CELL_W}px;min-width:${CELL_W}px;padding:3px 0;font-size:10px;top:48px">${cur.getDate()}</th>`;
+    cur.setDate(cur.getDate()+1);
+  }
+  h+='</tr>';
   
   document.getElementById('ganttHead').innerHTML = h;
 
