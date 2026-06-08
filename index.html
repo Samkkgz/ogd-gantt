@@ -1050,28 +1050,16 @@ async function inviteMember() {
         window._inviteEmail = email;
       } else {
         await sb.from('profiles').update({name, company, role}).eq('id', userId);
-        // Send login link
-        await sb.auth.signInWithOtp({ email,
-          options: { emailRedirectTo: window.location.origin + window.location.pathname }
-        }).catch(() => {});
-        await logAction('更新成员', `${name} (${email}) 信息已更新，已发送登录链接`);
+        await logAction('更新成员', `${name} (${email}) 信息已更新`);
         showToast(`✅ 已更新成员「${name}」的信息`,'success');
-        window._inviteMsg = `✅ 已更新「${name}」的信息 — 登录链接已发送至邮箱`;
+        window._inviteMsg = `✅ 已更新「${name}」的信息`;
       }
     } else {
-      // New user - use OTP magic link (no password, no email confirmation needed)
-      const { error: otpErr } = await sb.auth.signInWithOtp({
-        email, options: { shouldCreateUser: true, data: { name, company, role },
-          emailRedirectTo: window.location.origin + window.location.pathname }
-      });
-      if (otpErr) throw otpErr;
-      // Profile is created by trigger; set status to pending via RPC
-      await sb.rpc('admin_create_profile', {
-        p_id: data.user.id, p_email: email, p_name: name,
-        p_company: company, p_role: role
-      }).catch(() => {});
+      // New user or re-invite - use signUp with password (avoids OTP rate limit)
+      await ensureProfile(data.user.id, true);
       await logAction('邀请成员', `${name} (${email}) 已邀请，团队:${company}，角色:${role}`);
       showToast('📧 邀请已发送','success');
+      window._invitePw = tempPw;
       window._inviteEmail = email;
     }
     
@@ -1088,8 +1076,12 @@ async function inviteMember() {
     }
   } catch(e) {
     const msg = e.message || '';
-    if (msg.includes('security purposes') || msg.includes('seconds') || msg.includes('rate') || msg.includes('too many'))
-      showToast('⏳ 发送太频繁，请等待60秒后再试','error');
+    if (msg.includes('security purposes') || msg.includes('seconds') || msg.includes('rate') || msg.includes('too many')) {
+      // Try to extract wait seconds from error like "after 47 seconds"
+      const secMatch = msg.match(/(\d+)\s*seconds/);
+      const waitSec = secMatch ? parseInt(secMatch[1]) + 5 : 60;
+      showToast('⏳ 发送太频繁，请等待 ' + waitSec + ' 秒后再试','error');
+    }
     else if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
       showToast('❌ 邀请失败: ' + msg + ' — 需在Supabase后台→Authentication→Settings配置SMTP邮件服务','error');
     else if (msg.includes('foreign key'))
@@ -1151,8 +1143,11 @@ async function resendInvite(email, name) {
     showToast('📧 已重发','success');
   } catch(e) {
     const msg = e.message || '';
-    if (msg.includes('security purposes') || msg.includes('seconds') || msg.includes('rate') || msg.includes('too many'))
-      showToast('⏳ 发送太频繁，请等待60秒后再试','error');
+    if (msg.includes('security purposes') || msg.includes('seconds') || msg.includes('rate') || msg.includes('too many')) {
+      const secMatch = msg.match(/(\d+)\s*seconds/);
+      const waitSec = secMatch ? parseInt(secMatch[1]) + 5 : 60;
+      showToast('⏳ 发送太频繁，请等待 ' + waitSec + ' 秒后再试','error');
+    }
     else if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
       showToast('❌ 发送失败: ' + msg + ' — 需在Supabase后台→Authentication→Settings配置SMTP邮件服务','error');
     else
