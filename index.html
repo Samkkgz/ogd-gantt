@@ -1088,7 +1088,9 @@ async function inviteMember() {
     }
   } catch(e) {
     const msg = e.message || '';
-    if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
+    if (msg.includes('security purposes') || msg.includes('seconds') || msg.includes('rate') || msg.includes('too many'))
+      showToast('⏳ 发送太频繁，请等待60秒后再试','error');
+    else if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
       showToast('❌ 邀请失败: ' + msg + ' — 需在Supabase后台→Authentication→Settings配置SMTP邮件服务','error');
     else if (msg.includes('foreign key'))
       showToast('❌ 邀请失败: ' + msg,'error');
@@ -1149,7 +1151,9 @@ async function resendInvite(email, name) {
     showToast('📧 已重发','success');
   } catch(e) {
     const msg = e.message || '';
-    if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
+    if (msg.includes('security purposes') || msg.includes('seconds') || msg.includes('rate') || msg.includes('too many'))
+      showToast('⏳ 发送太频繁，请等待60秒后再试','error');
+    else if (msg.includes('SMTP') || msg.includes('smtp') || msg.includes('email') || msg.includes('mail'))
       showToast('❌ 发送失败: ' + msg + ' — 需在Supabase后台→Authentication→Settings配置SMTP邮件服务','error');
     else
       showToast('❌ 发送失败: ' + msg,'error');
