@@ -134,6 +134,12 @@ tr.phase-milestone td.cell,tr.phase-milestone td.del-cell,tr.phase-milestone td.
 
 /* Row hover effect on frozen cells */
 tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cell,tr:hover td.col-status-data{filter:brightness(0.97)}
+/* Filter row */
+.filter-row th{position:sticky;top:37px;z-index:30;background:#fff;padding:3px 2px;border-bottom:2px solid #91d5ff}
+.filter-row input,.filter-row select{width:calc(100% - 4px);padding:2px 4px;border:1px solid #d9d9d9;border-radius:4px;font-size:11px;margin:0 1px;box-sizing:border-box}
+.filter-row input:focus,.filter-row select:focus{border-color:#1890ff;outline:none}
+.filter-row select{background:#fff;cursor:pointer}
+.filter-row .filter-active{background:#e6f7ff;border-color:#1890ff}
 
 /* === CELL TYPES (frozen columns) === */
 .cell{padding:5px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -379,6 +385,41 @@ function saveColWidths() {
   try { localStorage.setItem('ogd_col_widths', JSON.stringify(o)); } catch(e) {}
 }
 
+// ============================================================
+// FILTER STATE
+// ============================================================
+let filters = {};
+
+function getFilterOptions(field) {
+  const vals = new Set();
+  tasks.forEach(t => { const v = t[field]; if(v !== null && v !== undefined && v !== '') vals.add(String(v)); });
+  return [...vals].sort();
+}
+
+function applyFilters() {
+  let filtered = [...tasks];
+  Object.keys(filters).forEach(field => {
+    const val = filters[field];
+    if (!val) return;
+    if (field === 'filter_content') {
+      filtered = filtered.filter(t => (t.content||'').toLowerCase().includes(val.toLowerCase()));
+    } else if (field === 'filter_deliverable') {
+      filtered = filtered.filter(t => (t.deliverable||'').toLowerCase().includes(val.toLowerCase()));
+    } else if (field === 'filter_responsible') {
+      filtered = filtered.filter(t => (t.responsible||'').toLowerCase().includes(val.toLowerCase()));
+    } else if (field === 'filter_milestone') {
+      if (val === 'yes') filtered = filtered.filter(t => t.milestone);
+      else if (val === 'no') filtered = filtered.filter(t => !t.milestone);
+    } else {
+      filtered = filtered.filter(t => String(t[field]||'') === val);
+    }
+  });
+  return filtered;
+}
+
+function onFilterChange() {
+  renderGantt();
+}
 function applyColStyles() {
   let left = 0;
   COL_DEFS.forEach(c => { c._left = left; left += c.width; });
@@ -573,9 +614,9 @@ function renderGantt() {
   const _sy = _wrapper ? _wrapper.scrollTop : 0;
   
   applyColStyles();
-  const data = msOnly ? tasks.filter(t=>t.milestone) : tasks;
+  const data = msOnly ? applyFilters().filter(t=>t.milestone) : applyFilters();
   if (!data.length) {
-    document.getElementById('ganttBody').innerHTML = '<tr><td colspan="20" style="text-align:center;padding:40px;color:#999">暂无任务</td></tr>';
+    document.getElementById('ganttBody').innerHTML = '<tr><td colspan="20" style="text-align:center;padding:40px;color:#999">' + (Object.values(filters).some(v=>v) ? '没有匹配筛选条件的任务' : '暂无任务') + '</td></tr>';
     renderMsOverview();
     updatePermNotice();
     return;
@@ -612,6 +653,32 @@ function renderGantt() {
     cur.setDate(cur.getDate()+1);
   }
   h+='</tr>';
+  
+  // === Filter row (row 3) ===
+  h += '<tr class="filter-row">';
+  COL_DEFS.forEach(c => {
+    const fid = 'filter_' + c.id;
+    const fv = filters[fid] || '';
+    const isActive = !!filters[fid];
+    if (c.id === 'phase' || c.id === 'company' || c.id === 'status') {
+      // Dropdown filter
+      const opts = getFilterOptions(c.id);
+      h += `<th class="col-${c.id}"><select id="${fid}" onchange="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}"><option value="">全部</option>`;
+      opts.forEach(o => h += `<option value="${o}" ${fv===o?'selected':''}>${o}</option>`);
+      h += '</select></th>';
+    } else if (c.id === 'milestone') {
+      h += `<th class="col-${c.id}"><select id="${fid}" onchange="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}">
+        <option value="">全部</option><option value="yes" ${fv==='yes'?'selected':''}>◆ 是</option><option value="no" ${fv==='no'?'selected':''}>◇ 否</option>
+      </select></th>`;
+    } else {
+      // Text filter
+      h += `<th class="col-${c.id}"><input id="${fid}" placeholder="筛选..." value="${fv}" oninput="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}"></th>`;
+    }
+  });
+  // Empty cells for gantt area
+  h += `<th colspan="${td+1}" style="padding:0;border-left:2px solid #91d5ff;background:#f5f7fa"></th>`;
+  h += '</tr>';
+  
   document.getElementById('ganttHead').innerHTML = h;
 
   // === Body ===
