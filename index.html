@@ -959,9 +959,13 @@ async function inviteMember() {
       if (profileByEmail) {
         // Update existing profile
         await sb.from('profiles').update({name, company, role}).eq('id', profileByEmail.id);
-        await logAction('更新成员', `${name} (${email}) 信息已更新`);
+        // Send magic link for login
+        await sb.auth.signInWithOtp({ email,
+          options: { emailRedirectTo: window.location.origin + window.location.pathname }
+        }).catch(() => {});
+        await logAction('更新成员', `${name} (${email}) 信息已更新，已发送登录链接`);
         showToast(`✅ 已更新成员「${name}」的信息`,'success');
-        window._inviteMsg = `✅ 已更新「${name}」的信息 — 密码未改变，如需重置请在登录页使用"忘记密码"`;
+        window._inviteMsg = `✅ 已更新「${name}」的信息 — 登录链接已发送至邮箱`;
       } else {
         // User exists in auth (can't access via client), no profile - show instructions
         throw new Error('该邮箱已注册但无档案。请在Supabase后台 → Authentication → Users 中找到该用户，记下其UUID，然后手动执行：\nINSERT INTO profiles (id, email, name, company, role, status) VALUES (\'该UUID\', \'' + email + '\', \'' + name + '\', \'' + company + '\', \'' + role + '\', \'pending\');');
@@ -971,23 +975,38 @@ async function inviteMember() {
       const userId = data.user.id;
       const { data: existing } = await sb.from('profiles').select('id').eq('id', userId).maybeSingle();
       if (!existing) {
+        // Send login link for existing user
+        await sb.auth.signInWithOtp({ email,
+          options: { emailRedirectTo: window.location.origin + window.location.pathname }
+        }).catch(() => {});
         await ensureProfile(userId, false);
         await logAction('添加成员', `${name} (${email}) 档案已补充`);
         showToast(`✅ 已添加成员「${name}」`,'success');
-        window._invitePw = tempPw;
         window._inviteEmail = email;
       } else {
         await sb.from('profiles').update({name, company, role}).eq('id', userId);
-        await logAction('更新成员', `${name} (${email}) 信息已更新`);
+        // Send login link
+        await sb.auth.signInWithOtp({ email,
+          options: { emailRedirectTo: window.location.origin + window.location.pathname }
+        }).catch(() => {});
+        await logAction('更新成员', `${name} (${email}) 信息已更新，已发送登录链接`);
         showToast(`✅ 已更新成员「${name}」的信息`,'success');
-        window._inviteMsg = `✅ 已更新「${name}」的信息 — 密码未改变，如用户忘记密码请在登录页使用"忘记密码"重置`;
+        window._inviteMsg = `✅ 已更新「${name}」的信息 — 登录链接已发送至邮箱`;
       }
     } else {
-      // New user or re-invite - create/update profile with pending status
-      await ensureProfile(data.user.id, true);
+      // New user - use OTP magic link (no password, no email confirmation needed)
+      const { error: otpErr } = await sb.auth.signInWithOtp({
+        email, options: { shouldCreateUser: true, data: { name, company, role },
+          emailRedirectTo: window.location.origin + window.location.pathname }
+      });
+      if (otpErr) throw otpErr;
+      // Profile is created by trigger; set status to pending via RPC
+      await sb.rpc('admin_create_profile', {
+        p_id: data.user.id, p_email: email, p_name: name,
+        p_company: company, p_role: role
+      }).catch(() => {});
       await logAction('邀请成员', `${name} (${email}) 已邀请，团队:${company}，角色:${role}`);
       showToast('📧 邀请已发送','success');
-      window._invitePw = tempPw;
       window._inviteEmail = email;
     }
     
@@ -995,12 +1014,11 @@ async function inviteMember() {
     document.getElementById('inviteName').value='';
     await renderAdmin();
     // Show invite result after renderAdmin (so it's not wiped)
-    if (window._invitePw) {
+    if (window._inviteEmail) {
       document.getElementById('inviteResult').style.display = 'block';
       document.getElementById('inviteResultMsg').innerHTML = `<strong>✅ 邀请已发送至 ${window._inviteEmail}</strong><br>
-        <span>初始密码：<code style="background:#f0f0f0;padding:2px 8px;border-radius:4px;font-size:14px;user-select:all">${window._invitePw}</code></span><br>
-        <span style="color:#999;font-size:12px">请将密码告知用户，首次登录后建议立即修改密码</span>`;
-      window._invitePw = null;
+        <span style="color:#999;font-size:12px">用户点击邮件中的链接即可直接登录，登录后可点击右上角「改密」设置密码</span>`;
+      window._inviteEmail = null;
       window._inviteEmail = null;
     }
   } catch(e) {
@@ -1051,25 +1069,18 @@ async function changeRole(userId, newRole) {
 async function resendInvite(email, name) {
   if (!email) return showToast('邮箱为空','error');
   try {
-    // Generate new temp password and try to re-signup (updates password for unconfirmed users)
-    const newPw = Math.random().toString(36).slice(2,10) + 'A1!';
-    await sb.auth.signUp({ 
-      email, password: newPw,
-      options: { emailRedirectTo: window.location.origin + window.location.pathname }
-    }).catch(() => {}); // ignore if user already exists
-    
-    // Also send magic link as fallback
-    await sb.auth.signInWithOtp({ 
+    // Send login link (OTP magic link - no password/confirmation needed)
+    const { error } = await sb.auth.signInWithOtp({ 
       email,
       options: { emailRedirectTo: window.location.origin + window.location.pathname }
     });
+    if (error) throw error;
     
-    await logAction('重发邀请', `${name||''} (${email}) 邀请已重发`);
+    await logAction('重发邀请', `${name||''} (${email}) 登录链接已重发`);
     await renderAdmin();
     document.getElementById('inviteResult').style.display = 'block';
-    document.getElementById('inviteResultMsg').innerHTML = `<strong>📧 邀请已重发至 ${email}</strong><br>
-      <span>初始密码：<code style="background:#f0f0f0;padding:2px 8px;border-radius:4px;font-size:14px;user-select:all">${newPw}</code></span><br>
-      <span style="color:#999;font-size:12px">用户也可直接点击邮件中的链接登录（无需密码）</span>`;
+    document.getElementById('inviteResultMsg').innerHTML = `<strong>📧 登录链接已重发至 ${email}</strong><br>
+      <span style="color:#999;font-size:12px">用户点击邮件中的链接即可直接登录，登录后可点击右上角「改密」设置密码</span>`;
     showToast('📧 已重发','success');
   } catch(e) {
     const msg = e.message || '';
