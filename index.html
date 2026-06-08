@@ -389,6 +389,7 @@ function saveColWidths() {
 // FILTER STATE
 // ============================================================
 let filters = {};
+let filterTimer = null;
 
 function getFilterOptions(field) {
   const vals = new Set();
@@ -417,8 +418,14 @@ function applyFilters() {
   return filtered;
 }
 
-function onFilterChange() {
-  renderGantt();
+function onFilterChange(delay) {
+  if (delay) {
+    if (filterTimer) clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => { filterTimer = null; renderGantt(); }, delay);
+  } else {
+    if (filterTimer) { clearTimeout(filterTimer); filterTimer = null; }
+    renderGantt();
+  }
 }
 function applyColStyles() {
   let left = 0;
@@ -657,7 +664,7 @@ function renderGantt() {
     } else if (c.id === 'milestone') {
       h += `<th class="col-${c.id}" style="top:24px"><select id="${fid}" onchange="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}">\n        <option value="">全部</option><option value="yes" ${fv==='yes'?'selected':''}>◆ 是</option><option value="no" ${fv==='no'?'selected':''}>◇ 否</option>\n      </select></th>`;
     } else {
-      h += `<th class="col-${c.id}" style="top:24px"><input id="${fid}" placeholder="筛选..." value="${fv}" oninput="filters['${fid}']=this.value;onFilterChange()" class="${isActive?'filter-active':''}"></th>`;
+      h += `<th class="col-${c.id}" style="top:24px"><input id="${fid}" placeholder="筛选..." value="${fv}" oninput="filters['${fid}']=this.value;onFilterChange(300)" class="${isActive?'filter-active':''}"></th>`;
     }
   });
   // Day numbers in the same row
