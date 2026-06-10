@@ -220,6 +220,23 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 
 .file-input-hidden{display:none}
 @media print{.tab-bar,.toolbar,.user-info button,.permission-notice,.ms-bar{display:none}}
+/* File manager */
+.file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-top:12px}
+.file-card{border:1px solid #e8e8e8;border-radius:10px;padding:14px;background:#fff;transition:box-shadow .2s;position:relative}
+.file-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.file-card .icon{font-size:32px;text-align:center;margin-bottom:8px}
+.file-card .fname{font-size:13px;font-weight:600;word-break:break-all;line-height:1.4;margin-bottom:4px}
+.file-card .fmeta{font-size:11px;color:#999}
+.file-card .factions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.file-card .factions button{padding:4px 10px;border:1px solid #d9d9d9;border-radius:4px;background:#fafafa;cursor:pointer;font-size:11px}
+.file-card .factions button:hover{background:#e6f7ff;border-color:#1890ff}
+.file-categories{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.file-categories button{padding:6px 14px;border:1px solid #d9d9d9;border-radius:20px;background:#fff;cursor:pointer;font-size:12px;transition:all .2s}
+.file-categories button:hover{border-color:#1890ff;color:#1890ff}
+.file-categories button.active{background:#1890ff;color:#fff;border-color:#1890ff}
+.file-upload-area{border:2px dashed #d9d9d9;border-radius:10px;padding:30px;text-align:center;margin-bottom:16px;cursor:pointer;transition:all .2s}
+.file-upload-area:hover{border-color:#1890ff;background:#f0f8ff}
+.file-upload-area.dragover{border-color:#1890ff;background:#e6f7ff}
 </style>
 </head>
 <body>
@@ -257,6 +274,7 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
   <div class="tab-bar">
     <button class="active" onclick="switchTab('gantt')">📊 甘特图</button>
     <button id="adminTabBtn" class="hide" onclick="switchTab('admin')">⚙️ 团队管理</button>
+    <button id="filesTabBtn" class="hide" onclick="switchTab('files')">📁 文件仓库</button>
   </div>
 
   <div id="tabGantt" class="page-content">
@@ -288,6 +306,9 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 
   <div id="tabAdmin" class="page-content hide">
     <div id="adminContent"></div>
+  </div>
+  <div id="tabFiles" class="page-content hide">
+    <div id="filesContent"></div>
   </div>
 </div>
 
@@ -536,6 +557,8 @@ async function loadProfile(user) {
       document.getElementById('adminBtn').classList.remove('hide');
       document.getElementById('adminTabBtn').classList.remove('hide');
     }
+    // File tab is visible to all logged-in users
+    document.getElementById('filesTabBtn').classList.remove('hide');
     
     showApp();
     await loadTasks();
@@ -544,6 +567,8 @@ async function loadProfile(user) {
       const savedTab = localStorage.getItem('ogd_tab');
       if (savedTab === 'admin' && (data.role === 'super_admin' || data.role === 'admin')) {
         switchTab('admin');
+      } else if (savedTab === 'files') {
+        switchTab('files');
       }
     } catch(e) {}
   }
@@ -571,9 +596,14 @@ async function switchTab(tab) {
   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
   document.getElementById('tabGantt').classList.add('hide');
   document.getElementById('tabAdmin').classList.add('hide');
+  document.getElementById('tabFiles').classList.add('hide');
   if (tab === 'gantt') {
     document.querySelector('.tab-bar button:first-child').classList.add('active');
     document.getElementById('tabGantt').classList.remove('hide');
+  } else if (tab === 'files') {
+    document.getElementById('filesTabBtn').classList.add('active');
+    document.getElementById('tabFiles').classList.remove('hide');
+    await renderFiles();
   } else {
     document.getElementById('adminTabBtn').classList.add('active');
     document.getElementById('tabAdmin').classList.remove('hide');
@@ -1274,6 +1304,152 @@ async function forgotPw() {
 
 // Modal click to close
 document.getElementById('pwModal').addEventListener('click',function(e){if(e.target===this)closePwModal();});
+
+// ============================================================
+// FILE STORAGE
+// ============================================================
+let files = [];
+let activeFileCategory = '';
+let sbStorage = null;
+
+function initStorage() {
+  // Supabase Storage is available via the supabase client
+  sbStorage = sb.storage;
+}
+
+async function renderFiles() {
+  initStorage();
+  const isManager = currentUser && (currentUser.role === 'super_admin' || currentUser.role === 'admin');
+  const categories = ['全部', '项目立项文件', '执行标准', '会议纪要', '周期性报告', '其他'];
+  const catIcons = {'项目立项文件':'📋','执行标准':'📐','会议纪要':'📝','周期性报告':'📊','其他':'📁'};
+
+  try {
+    const { data: fileData } = await sb.from('file_metadata').select('*, uploaded_by_profile:profiles!uploaded_by(name)').order('uploaded_at', { ascending: false });
+    files = fileData || [];
+  } catch(e) { files = []; }
+
+  let html = '<h2 style="margin-bottom:8px;display:flex;align-items:center;gap:8px">📁 文件仓库</h2>';
+
+  // Upload area (managers only)
+  if (isManager) {
+    html += `<div class="file-upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()" ondragover="this.classList.add('dragover');event.preventDefault()" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event)">
+      <div style="font-size:40px;margin-bottom:8px">📤</div>
+      <div style="font-weight:600;color:#333">点击上传或拖拽文件到此处</div>
+      <div style="font-size:12px;color:#999;margin-top:4px">支持所有文件格式，单文件最大50MB</div>
+      <input type="file" id="fileInput" style="display:none" onchange="uploadFile(this.files[0])" multiple>
+    </div>`;
+  }
+
+  // Category filter
+  html += '<div class="file-categories">';
+  categories.forEach(c => {
+    const count = c === '全部' ? files.length : files.filter(f => f.category === c).length;
+    html += `<button class="${activeFileCategory === c || (c==='全部' && !activeFileCategory)?'active':''}" onclick="activeFileCategory='${c==='全部'?'':c}';renderFiles()">${(catIcons[c]||'📁')+' '+c} (${count})</button>`;
+  });
+  html += '</div>';
+
+  // File grid
+  const filtered = activeFileCategory ? files.filter(f => f.category === activeFileCategory) : files;
+  if (!filtered.length) {
+    html += '<div style="text-align:center;padding:40px;color:#999">暂无文件</div>';
+  } else {
+    html += '<div class="file-grid">';
+    filtered.forEach(f => {
+      const ext = (f.original_name||'').split('.').pop().toLowerCase();
+      const icon = ext==='pdf'?'📄':(ext==='doc'||ext==='docx'?'📃':(ext==='xls'||ext==='xlsx'?'📊':(ext==='jpg'||ext==='png'||ext==='gif'?'🖼️':(ext==='ppt'||ext==='pptx'?'📽️':'📁'))));
+      const size = f.file_size > 1024*1024 ? (f.file_size/1024/1024).toFixed(1)+' MB' : (f.file_size/1024).toFixed(1)+' KB';
+      const uploader = f.uploaded_by_profile?.name || '未知';
+      const date = new Date(f.uploaded_at).toLocaleDateString('zh-CN');
+      html += `<div class="file-card">
+        <div class="icon">${icon}</div>
+        <div class="fname" title="${f.original_name}">${f.original_name}</div>
+        <div class="fmeta">${size} · ${uploader} · ${date}</div>
+        <div class="factions">
+          <button onclick="downloadFile(${f.id},'${f.original_name}','${f.storage_path}')">⬇️ 下载</button>
+          ${isManager ? `<button onclick="deleteFile(${f.id})" style="color:#ff4d4f">🗑️ 删除</button>` : ''}
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  document.getElementById('filesContent').innerHTML = html;
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.remove('dragover');
+  if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
+}
+
+async function uploadFile(file) {
+  if (!file) return;
+  // Ask for category
+  const category = prompt('选择文件分类：\n1. 项目立项文件\n2. 执行标准\n3. 会议纪要\n4. 周期性报告\n5. 其他', '会议纪要');
+  const catMap = {'1':'项目立项文件','2':'执行标准','3':'会议纪要','4':'周期性报告','5':'其他'};
+  const cat = catMap[category] || category || '其他';
+  if (!['项目立项文件','执行标准','会议纪要','周期性报告','其他'].includes(cat)) {
+    return showToast('无效的分类','error');
+  }
+
+  const path = `${cat}/${Date.now()}_${file.name}`;
+  try {
+    showToast('⏳ 上传中...','info');
+    const { error: uploadErr } = await sbStorage.from('project_files').upload(path, file);
+    if (uploadErr) throw uploadErr;
+
+    const { error: metaErr } = await sb.from('file_metadata').insert({
+      filename: path,
+      original_name: file.name,
+      file_size: file.size,
+      mime_type: file.type || 'application/octet-stream',
+      storage_path: path,
+      category: cat,
+      uploaded_by: currentUser.id
+    });
+    if (metaErr) {
+      // Clean up file if metadata insert fails
+      await sbStorage.from('project_files').remove([path]);
+      throw metaErr;
+    }
+    showToast('✅ 上传成功','success');
+    await logAction('上传文件', `${file.name} → ${cat}`);
+    renderFiles();
+  } catch(e) {
+    showToast('❌ 上传失败: ' + (e.message || e),'error');
+  }
+}
+
+async function downloadFile(id, originalName, storagePath) {
+  try {
+    const { data, error } = await sbStorage.from('project_files').download(storagePath);
+    if (error) throw error;
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url; a.download = originalName; a.click();
+    URL.revokeObjectURL(url);
+    await logAction('下载文件', originalName);
+  } catch(e) {
+    showToast('❌ 下载失败: ' + (e.message || e),'error');
+  }
+}
+
+async function deleteFile(id) {
+  if (!confirm('确定要删除这个文件吗？')) return;
+  try {
+    const f = files.find(x => x.id === id);
+    if (!f) throw new Error('文件不存在');
+    const { error: storageErr } = await sbStorage.from('project_files').remove([f.storage_path]);
+    if (storageErr) throw storageErr;
+    const { error: metaErr } = await sb.from('file_metadata').delete().eq('id', id);
+    if (metaErr) throw metaErr;
+    showToast('✅ 已删除','success');
+    await logAction('删除文件', f.original_name);
+    renderFiles();
+  } catch(e) {
+    showToast('❌ 删除失败: ' + (e.message || e),'error');
+  }
+}
 
 // ============================================================
 // KEYBOARD
