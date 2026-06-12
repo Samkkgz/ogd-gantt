@@ -1011,10 +1011,11 @@ async function uploadFile(file) {
     return showToast('无效的分类','error');
   }
 
-  const path = cat + '/' + Date.now() + '_' + file.name;
+  const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/_+/g, '_').substring(0, 100);
+  const path = cat + '/' + Date.now() + '_' + safeName;
   try {
     showToast('⏳ 上传中...','info');
-    const { error: uploadErr } = await sbStorage.from('project_files').upload(path, file);
+    const { error: uploadErr } = await sbStorage.from('project_files').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
     if (uploadErr) throw uploadErr;
 
     const { error: metaErr } = await sb.from('file_metadata').insert({
