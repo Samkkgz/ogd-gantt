@@ -219,7 +219,6 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 .file-upload-area{border:2px dashed #d9d9d9;border-radius:10px;padding:30px;text-align:center;margin-bottom:16px;cursor:pointer;transition:all .2s}
 .file-upload-area:hover{border-color:#1890ff;background:#f0f8ff}
 .file-upload-area.dragover{border-color:#1890ff;background:#e6f7ff}
-
 @media print{.tab-bar,.toolbar,.user-info button,.permission-notice,.ms-bar{display:none}}
 </style>
 </head>
@@ -515,9 +514,21 @@ async function loadProfile(user) {
       document.getElementById('adminBtn').classList.remove('hide');
       document.getElementById('adminTabBtn').classList.remove('hide');
     }
+    // File tab is visible to all logged-in users
+    document.getElementById('filesTabBtn').classList.remove('hide');
     
     showApp();
     await loadTasks();
+    
+    // Restore saved tab
+    try {
+      const savedTab = localStorage.getItem('ogd_tab');
+      if (savedTab === 'admin' && (data.role === 'super_admin' || data.role === 'admin')) {
+        switchTab('admin');
+      } else if (savedTab === 'files') {
+        switchTab('files');
+      }
+    } catch(e) {}
   }
 }
 
@@ -546,16 +557,16 @@ function switchTab(tab) {
   if (tab === 'gantt') {
     document.querySelector('.tab-bar button:first-child').classList.add('active');
     document.getElementById('tabGantt').classList.remove('hide');
-  } else {
-    } else if (tab === 'files') {
+  } else if (tab === 'files') {
     document.getElementById('filesTabBtn').classList.add('active');
     document.getElementById('tabFiles').classList.remove('hide');
-    await renderFiles();
+    renderFiles();
   } else {
     document.getElementById('adminTabBtn').classList.add('active');
     document.getElementById('tabAdmin').classList.remove('hide');
     renderAdmin();
   }
+  localStorage.setItem('ogd_tab', tab);
 }
 
 function showAdminPanel() { switchTab('admin'); }
@@ -937,7 +948,6 @@ async function renderFiles() {
 
   let html = '<h2 style="margin-bottom:8px;display:flex;align-items:center;gap:8px">📁 文件仓库</h2>';
 
-  // Upload area (managers only)
   if (isManager) {
     html += '<div class="file-upload-area" id="uploadArea" onclick="document.getElementById(\'fileInput\').click()" ondragover="this.classList.add(\'dragover\');event.preventDefault()" ondragleave="this.classList.remove(\'dragover\')" ondrop="handleDrop(event)">' +
       '<div style="font-size:40px;margin-bottom:8px">📤</div>' +
@@ -947,7 +957,6 @@ async function renderFiles() {
     '</div>';
   }
 
-  // Category filter
   html += '<div class="file-categories">';
   categories.forEach(c => {
     const count = c === '全部' ? files.length : files.filter(f => f.category === c).length;
@@ -956,7 +965,6 @@ async function renderFiles() {
   });
   html += '</div>';
 
-  // File grid
   const filtered = activeFileCategory ? files.filter(f => f.category === activeFileCategory) : files;
   if (!filtered.length) {
     html += '<div style="text-align:center;padding:40px;color:#999">暂无文件</div>';
@@ -994,7 +1002,7 @@ function handleDrop(e) {
 
 async function uploadFile(file) {
   if (!file) return;
-  if (!sbStorage) initStorage();  // ★ FIX 1: ensure storage client is initialized ★
+  if (!sbStorage) initStorage();  // ★ FIX: ensure storage client is initialized ★
   
   const category = prompt('选择文件分类：\n1. 项目立项文件\n2. 执行标准\n3. 会议纪要\n4. 周期性报告\n5. 其他', '会议纪要');
   const catMap = {'1':'项目立项文件','2':'执行标准','3':'会议纪要','4':'周期性报告','5':'其他'};
