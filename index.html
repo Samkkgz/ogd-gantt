@@ -1000,19 +1000,24 @@ function handleDrop(e) {
   if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
 }
 
+let _pendingUploadFile = null;
+
 async function uploadFile(file) {
   if (!file) return;
-  if (!sbStorage) initStorage();  // ★ FIX: ensure storage client is initialized ★
-  
-  const category = prompt('选择文件分类：\n1. 项目立项文件\n2. 执行标准\n3. 会议纪要\n4. 周期性报告\n5. 其他', '会议纪要');
-  const catMap = {'1':'项目立项文件','2':'执行标准','3':'会议纪要','4':'周期性报告','5':'其他'};
-  const cat = catMap[category] || category || '其他';
-  if (!['项目立项文件','执行标准','会议纪要','周期性报告','其他'].includes(cat)) {
-    return showToast('无效的分类','error');
-  }
+  if (!sbStorage) initStorage();
+  _pendingUploadFile = file;
+  document.getElementById('fileCatModal').classList.add('active');  // Show category picker
+}
 
-  const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/_+/g, '_').substring(0, 100);
-  const path = cat + '/' + Date.now() + '_' + safeName;
+async function doUploadWithCategory(cat) {
+  const file = _pendingUploadFile;
+  _pendingUploadFile = null;
+  if (!file || !cat) return;
+  if (!sbStorage) initStorage();
+
+  const folderMap = {'项目立项文件':'project_docs','执行标准':'standards','会议纪要':'meeting_minutes','周期性报告':'periodic_reports','其他':'other'};
+  const safeName = file.name.replace(/[^a-zA-Z0-9.-\u4e00-\u9fff]/g, '_').replace(/_+/g, '_').substring(0, 100);
+  const path = (folderMap[cat]||'other') + '/' + Date.now() + '_' + safeName;
   try {
     showToast('⏳ 上传中...','info');
     const { error: uploadErr } = await sbStorage.from('project_files').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
@@ -1067,6 +1072,27 @@ async function deleteFile(id) {
     renderFiles();
   } catch(e) {
     showToast('❌ 删除失败: ' + (e.message || e),'error');
+  }
+}
+
+// ============================================================
+// FILE CATEGORY MODAL
+// ============================================================
+function pickFileCat(cat) {
+  closeFileCatModal();
+  if (window._fileCatResolve) {
+    window._fileCatResolve(cat);
+    window._fileCatResolve = null;
+  }
+  // Resume upload with selected category
+  doUploadWithCategory(cat);
+}
+
+function closeFileCatModal() {
+  document.getElementById('fileCatModal').classList.remove('active');
+  if (window._fileCatResolve) {
+    window._fileCatResolve(null);
+    window._fileCatResolve = null;
   }
 }
 
@@ -1131,5 +1157,22 @@ async function init() {
 
 init();
 </script>
+  <!-- File Category Modal -->
+  <div id="fileCatModal" class="modal-overlay" onclick="if(event.target===this){closeFileCatModal();}">
+    <div class="modal" style="max-width:400px">
+      <h3 style="margin-bottom:16px">📁 选择文件分类</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button class="cat-btn" onclick="pickFileCat('项目立项文件')" style="padding:14px;border:1px solid #d9d9d9;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;transition:all .2s">📋 项目立项文件</button>
+        <button class="cat-btn" onclick="pickFileCat('执行标准')" style="padding:14px;border:1px solid #d9d9d9;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;transition:all .2s">📐 执行标准</button>
+        <button class="cat-btn" onclick="pickFileCat('会议纪要')" style="padding:14px;border:1px solid #d9d9d9;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;transition:all .2s">📝 会议纪要</button>
+        <button class="cat-btn" onclick="pickFileCat('周期性报告')" style="padding:14px;border:1px solid #d9d9d9;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;transition:all .2s">📊 周期性报告</button>
+        <button class="cat-btn" onclick="pickFileCat('其他')" style="padding:14px;border:1px solid #d9d9d9;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;transition:all .2s;grid-column:1/3">📁 其他</button>
+      </div>
+    </div>
+  </div>
+  <style>
+    .cat-btn:hover{background:#e6f7ff !important;border-color:#1890ff !important}
+  </style>
+
 </body>
 </html>
