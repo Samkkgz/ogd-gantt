@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [ develop, 'feat/**', 'fix/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check HTML validity
+        run: |
+          # 检查 HTML 文件是否包含基本结构
+          for f in *.html; do
+            echo "检查 $f ..."
+            grep -q '<!DOCTYPE html>' "$f" && echo "  ✅ DOCTYPE 存在"
+            grep -q '</html>' "$f" && echo "  ✅ 闭合标签存在"
+          done
+
+      - name: Security check - no hardcoded secrets
+        run: |
+          ! grep -r --include='*.html' --include='*.js' --include='*.sql' \
+            -E '(api[_-]?key|secret|password|token)\s*[:=]\s*["'"'"']' . \
+            --exclude-dir=.git 2>/dev/null || \
+            (echo "⚠️  发现可能的硬编码密钥"; exit 1)
