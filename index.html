@@ -325,6 +325,8 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 <div class="toast" id="toast"></div>
 
 <script>
+// Safe logAction - defined first so it's always available
+
 // ============================================================
 // CONFIG —  YOU NEED TO SET THESE
 // ============================================================
@@ -335,7 +337,10 @@ const SUPABASE_ANON_KEY = 'sb_publishable_FzbUzMQX3Z00aUyj0qik9w_vUI9ntCR'; // �
 // SUPABASE CLIENT
 // ============================================================
 const { createClient } = supabase;
-const sb = SUPABASE_URL ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const sb = SUPABASE_URL ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
+  global: { headers: { 'X-Client-Info': 'ogd-gantt@1.0' } }
+}) : null;
 
 // ============================================================
 // STATE
@@ -500,8 +505,39 @@ async function checkSession() {
 }
 
 async function loadProfile(user) {
-  const { data } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  // Try to load existing profile
+  let { data, error } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  // If no profile exists, auto-create one for new users
+  if (!data && !error) {
+    const userMeta = user.user_metadata || {};
+    const defaultName = userMeta.name || user.email?.split('@')[0] || 'New User';
+    const defaultCompany = userMeta.company || 'ECS';
+    const { data: newProfile, error: createErr } = await sb.from('profiles').insert({
+      id: user.id,
+      email: user.email,
+      name: defaultName,
+      company: defaultCompany,
+      role: 'member'
+    }).select().single();
+    if (!createErr) { data = newProfile; }
+  }
   if (data) {
+    // Check if user is inactive
+    // If status column doesn't exist yet, this check safely passes
+    if (data.status === 'inactive') {
+      await sb.auth.signOut();
+      showLoginMsg('❌ 你的账号已被管理员停用，请联系管理员','error');
+      document.getElementById('loadingScreen').classList.add('hide');
+      document.getElementById('loginPage').classList.remove('hide');
+      return;
+    }
+    
+    // Set status to active on successful login (safe if column doesn't exist)
+    if (data.status && data.status !== 'active') {
+      try { await sb.from('profiles').update({status:'active'}).eq('id', user.id); } catch(e) {}
+      data.status = 'active';
+    }
+    
     currentUser = data;
     // Update user display
     document.getElementById('userName').textContent = data.name || data.email;
@@ -595,6 +631,25 @@ function canEdit(company) {
 
 function canDelete() {
   return currentUser && (currentUser.role === 'super_admin' || currentUser.role === 'admin');
+}
+
+// ============================================================
+// AUTO AUDIT LOG
+// ============================================================
+async function logAction(action, detail) {
+  // This function is called after main operations succeed
+  // If logging fails, it should NOT affect the main operation
+  try {
+    if (typeof sb === 'undefined' || !sb || typeof currentUser === 'undefined' || !currentUser) return;
+    const { error } = await sb.from('activity_log').insert({
+      user_id: currentUser.id,
+      user_name: currentUser.name || currentUser.email,
+      company: currentUser.company,
+      action: action,
+      detail: detail
+    });
+    if (error) console.warn('[LogAction] 记录失败:', error.message);
+  } catch(e) {}
 }
 
 // ============================================================
@@ -841,16 +896,21 @@ async function renderAdmin() {
   // Members table
   html += `<div class="admin-section"><h2>👥 团队成员</h2>
     <table class="member-table">
-      <tr><th>邮箱</th><th>姓名</th><th>公司</th><th>角色</th><th>操作</th></tr>`;
+      <tr><th>邮箱</th><th>姓名</th><th>公司</th><th>角色</th><th>状态</th><th>操作</th></tr>`;
   
   if(members) members.forEach(m => {
     const canManage = isSuper || (isAdmin && m.company === currentUser.company);
+    const st = m.status||'pending';
+    const stLabel = {active:'Active',pending:'Pending',inactive:'Inactive'}[st]||'Pending';
+    const stColor = st==='active'?'#52c41a':(st==='inactive'?'#ff4d4f':'#faad14');
+    const stBg = st==='active'?'#f6ffed':(st==='inactive'?'#fff2f0':'#fffbe6');
     html += `<tr>
       <td>${m.email||'—'}</td>
       <td>${m.name||'—'}</td>
       <td><span class="user-badge badge-${m.company}">${m.company||'—'}</span></td>
       <td><span class="user-badge badge-${m.role==='super_admin'?'super_admin':(m.role==='admin'?'admin':'')}">${m.role==='super_admin'?'超级管理员':(m.role==='admin'?'管理员':'成员')}</span></td>
-      <td>${canManage&&m.role!=='super_admin'?`<select onchange="changeRole('${m.id}',this.value)"><option value="member" ${m.role==='member'?'selected':''}>成员</option><option value="admin" ${m.role==='admin'?'selected':''}>管理员</option></select>`:'—'}</td>
+      <td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:500;color:${stColor};background:${stBg};border:1px solid ${stColor}22">${stLabel}</span></td>
+      <td>${canManage&&m.role!=='super_admin'?`<div style="display:flex;gap:4px;align-items:center"><select onchange="changeRole('${m.id}',this.value)" style="font-size:12px;padding:2px 4px"><option value="member" ${m.role==='member'?'selected':''}>成员</option><option value="admin" ${m.role==='admin'?'selected':''}>管理员</option></select>${st==='active'?`<button onclick="changeMemberStatus('${m.id}','inactive')" style="font-size:11px;padding:2px 6px;border:1px solid #ff4d4f;border-radius:4px;background:#fff;color:#ff4d4f;cursor:pointer" title="停用">⛔</button>`:(st==='inactive'?`<button onclick="changeMemberStatus('${m.id}','active')" style="font-size:11px;padding:2px 6px;border:1px solid #52c41a;border-radius:4px;background:#fff;color:#52c41a;cursor:pointer" title="启用">✅</button>`:'')}</div>`:'—'}</td>
     </tr>`;
   });
   html += '</table></div>';
@@ -901,6 +961,13 @@ async function changeRole(userId, newRole) {
   else { showToast('✅ 角色已更新','success'); renderAdmin(); }
 }
 
+async function changeMemberStatus(userId, newStatus) {
+  const label = {active:'Active',pending:'Pending',inactive:'Inactive'}[newStatus]||newStatus;
+  const { error } = await sb.from('profiles').update({status:newStatus}).eq('id',userId);
+  if(error) showToast('❌ 状态更新失败: '+error.message,'error');
+  else { showToast('✅ 状态已设为 '+label,'success'); renderAdmin(); }
+}
+
 // ============================================================
 // PERMISSION NOTICE
 // ============================================================
@@ -923,16 +990,285 @@ function showToast(msg, type) {
   clearTimeout(t._timer); t._timer=setTimeout(()=>t.classList.remove('show'),3000);
 }
 
-
 // ============================================================
 // FILE STORAGE
 // ============================================================
 let files = [];
 let activeFileCategory = '';
 let sbStorage = null;
+let _storageReady = false;
 
 function initStorage() {
-  sbStorage = sb.storage;
+  return true;
+}
+
+// Get user JWT from Supabase SDK session
+async function getAccessToken() {
+  // Method 1: SDK getSession (primary)
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.access_token) return session.access_token;
+  } catch(e) {
+    console.warn('[Token] SDK getSession failed:', e.message);
+  }
+  
+  // Method 2: localStorage fallback (bypasses SDK)
+  // Supabase stores session in localStorage as sb-<ref>-auth-token
+  try {
+    const projectRef = SUPABASE_URL.replace('https://', '').split('.')[0];
+    const key = 'sb-' + projectRef + '-auth-token';
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.access_token) {
+        console.log('[Token] Got token from localStorage');
+        return parsed.access_token;
+      }
+    }
+  } catch(e) {
+    console.warn('[Token] localStorage fallback failed:', e.message);
+  }
+  
+  console.warn('[Token] No token available');
+  return null;
+}
+
+// Generic Supabase Storage REST API call using user's JWT
+async function storageAPI(method, path, body) {
+  const token = await getAccessToken();
+  if (!token) throw new Error('UNAUTHORIZED: No auth token');
+  
+  // URL-encode for non-ASCII characters in filenames
+  const url = encodeURI(SUPABASE_URL + '/storage/v1/' + path);
+  const options = { method, headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_ANON_KEY } };
+  if (body) options.body = body;
+  
+  console.log('[StorageAPI]', method, url);
+  const resp = await fetch(url, options);
+  if (!resp.ok) {
+    const text = await resp.text();
+    console.error('[StorageAPI Error]', resp.status, text);
+    // Classify the error for better user messaging
+    const err = new Error(text || 'HTTP ' + resp.status);
+    err.status = resp.status;
+    if (text.includes('policy') || text.includes('permission') || text.includes('violates') || resp.status === 401 || resp.status === 403) {
+      err.code = 'PERMISSION_DENIED';
+    } else if (text.includes('bucket') || text.includes('not found') || resp.status === 404) {
+      err.code = 'BUCKET_NOT_FOUND';
+    } else if (resp.status === 409) {
+      err.code = 'CONFLICT';
+    }
+    throw err;
+  }
+  return resp;
+}
+
+// Check if the storage bucket exists (raw fetch, no SDK)
+async function ensureBucketExists() {
+  try {
+    const resp = await storageAPI('GET', 'bucket');
+    const buckets = await resp.json();
+    const exists = buckets && buckets.some(b => b.name === 'project_files' || b.id === 'project_files');
+    console.log('[BucketCheck] project_files bucket ' + (exists ? 'EXISTS' : 'NOT FOUND'));
+    if (!exists) console.warn('[BucketCheck] Run init_database.sql in Supabase SQL Editor');
+    return exists;
+  } catch(e) {
+    console.warn('[BucketCheck] Failed:', e.message);
+    return false;
+  }
+}
+
+// Upload file directly via raw fetch (PRIMARY method)
+async function uploadFileDirect(path, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  // Do NOT set Content-Type - let browser set multipart/form-data boundary
+  const resp = await storageAPI('POST', 'object/project_files/' + path, formData);
+  console.log('[Upload] Success:', path);
+  return resp;
+}
+
+// Download file via raw fetch
+async function downloadFileDirect(path) {
+  const resp = await storageAPI('GET', 'object/project_files/' + path);
+  const blob = await resp.blob();
+  return blob;
+}
+
+// Delete file via raw fetch
+async function deleteFileDirect(path) {
+  await storageAPI('DELETE', 'object/project_files/' + path);
+  console.log('[Delete] Success:', path);
+}
+
+// Main download function (called from onclick handlers in renderFiles)
+async function downloadFile(id, originalName, storagePath) {
+  try {
+    console.log('[Download] Starting:', originalName, 'path:', storagePath);
+    const token = await getAccessToken();
+    if (!token) return showToast('❌ 无法获取登录令牌','error');
+    
+    const resp = await fetch(encodeURI(SUPABASE_URL + '/storage/v1/object/project_files/' + storagePath), {
+      headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_ANON_KEY }
+    });
+    
+    if (!resp.ok) {
+      const errText = await resp.text();
+      if (resp.status === 401 || resp.status === 403) return showToast('❌ 下载权限不足','error');
+      if (resp.status === 404) return showToast('❌ 文件在存储中未找到','error');
+      throw new Error('HTTP ' + resp.status + ': ' + errText.substring(0, 100));
+    }
+    
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = originalName || 'download'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    try { await logAction('下载文件', originalName); } catch(e) {}
+  } catch(e) {
+    console.error('[Download] Error:', e);
+    showToast('❌ 下载失败: ' + (e.message || String(e)).substring(0, 100),'error');
+  }
+}
+
+// Main delete function (called from onclick handlers in renderFiles)
+async function deleteFile(id) {
+  if (!confirm('确定要删除这个文件吗？')) return;
+  try {
+    const f = files.find(x => x.id === id);
+    if (!f) return showToast('❌ 文件不存在','error');
+    console.log('[Delete] Deleting:', f.original_name, 'path:', f.storage_path);
+    
+    const token = await getAccessToken();
+    if (!token) return showToast('❌ 无法获取登录令牌','error');
+    
+    const delResp = await fetch(encodeURI(SUPABASE_URL + '/storage/v1/object/project_files/' + f.storage_path), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_ANON_KEY }
+    });
+    
+    if (!delResp.ok) {
+      const errText = await delResp.text();
+      if (delResp.status === 401 || delResp.status === 403 || errText.includes('policy')) {
+        return showToast('❌ 删除权限不足：仅管理员可删除文件','error');
+      }
+      throw new Error('HTTP ' + delResp.status + ': ' + errText.substring(0, 100));
+    }
+    
+    const { error: metaErr } = await sb.from('file_metadata').delete().eq('id', id);
+    if (metaErr) throw metaErr;
+    
+    showToast('✅ 已删除','success');
+    try { await logAction('删除文件', f.original_name); } catch(e) {}
+    renderFiles();
+  } catch(e) {
+    console.error('[Delete] Error:', e);
+    showToast('❌ 删除失败: ' + (e.message || String(e)).substring(0, 100),'error');
+  }
+}
+
+// Show an error toast with a detailed message
+function showStorageError(err, context) {
+  console.error('[' + context + ' Error]', err);
+  let msg = '';
+  if (err.code === 'PERMISSION_DENIED' || err.status === 401 || err.status === 403) {
+    if (context === 'Upload' || context === 'upload') {
+      msg = '❌ 权限不足：请确保：\n1. 你已在Supabase运行了 init_database.sql\n2. 你的账号已登录\n3. 如仍不行，请联系管理员检查你的角色';
+    } else {
+      msg = '❌ 操作权限不足';
+    }
+  } else if (err.code === 'BUCKET_NOT_FOUND' || err.status === 404) {
+    msg = '❌ 存储桶未找到：请在 Supabase SQL Editor 运行 init_database.sql';
+  } else if (err.status === 409) {
+    msg = '❌ 文件已存在';
+  } else {
+    msg = '❌ ' + context + '失败: ' + (err.message || String(err)).substring(0, 200);
+  }
+  showToast(msg, 'error');
+}
+
+// Run a full diagnostic test of the storage system
+async function testStorageSystem() {
+  console.log('=== STORAGE DIAGNOSTIC START ===');
+  const results = [];
+  
+  // Test 1: Check token
+  try {
+    const token = await getAccessToken();
+    results.push({ step: '获取登录令牌', ok: !!token, detail: token ? '成功 (' + token.substring(0, 20) + '...)' : '无令牌' });
+  } catch(e) { results.push({ step: '获取登录令牌', ok: false, detail: e.message }); }
+  
+  // Test 2: List buckets
+  try {
+    const resp = await storageAPI('GET', 'bucket');
+    const buckets = await resp.json();
+    const hasProjectFiles = buckets.some(b => b.name === 'project_files');
+    results.push({ step: '查询存储桶列表', ok: true, detail: '找到 ' + buckets.length + ' 个桶, project_files: ' + (hasProjectFiles ? '✅' : '❌ 不存在!') });
+    if (!hasProjectFiles) {
+      results.push({ step: '→ 需要创建 project_files 存储桶', ok: false, detail: '请在 Supabase SQL Editor 运行 init_database.sql' });
+    }
+  } catch(e) {
+    results.push({ step: '查询存储桶列表', ok: false, detail: e.message });
+    if (e.code === 'PERMISSION_DENIED') {
+      results.push({ step: '→ 权限问题', ok: false, detail: '你的 JWT 令牌无法查询存储桶，可能是 RLS 策略未正确设置' });
+    }
+  }
+  
+  // Test 3: Check file_metadata table
+  try {
+    const { data, error } = await sb.from('file_metadata').select('id').limit(1);
+    results.push({ step: '访问 file_metadata 表', ok: !error, detail: error ? error.message : '✅ 可正常访问' });
+  } catch(e) { results.push({ step: '访问 file_metadata 表', ok: false, detail: e.message }); }
+  
+  // Test 4: Check profiles table
+  try {
+    const { data, error } = await sb.from('profiles').select('id,role').eq('id', (await sb.auth.getSession()).data.session?.user?.id).single();
+    if (data) {
+      results.push({ step: '当前用户角色', ok: true, detail: data.role + ' - ' + (['super_admin','admin'].includes(data.role) ? '✅ 可上传文件' : '⚠️ 需管理员提升权限才能上传') });
+    } else {
+      results.push({ step: '当前用户角色', ok: false, detail: error ? error.message : '无 profile 记录' });
+    }
+  } catch(e) { results.push({ step: '当前用户角色', ok: false, detail: e.message }); }
+  
+  // Test 5: Upload a tiny test file
+  if (results.some(r => r.ok && r.step === '查询存储桶列表')) {
+    try {
+      const testBlob = new Blob(['diagnostic_test'], { type: 'text/plain' });
+      const testFile = new File([testBlob], '_diag_test.txt', { type: 'text/plain' });
+      const testPath = '_diag/' + Date.now() + '_test.txt';
+      await uploadFileDirect(testPath, testFile);
+      results.push({ step: '上传测试文件 (1KB)', ok: true, detail: '✅ 上传成功!' });
+      // Clean up test file
+      try { await deleteFileDirect(testPath); } catch(e) {}
+    } catch(e) {
+      results.push({ step: '上传测试文件 (1KB)', ok: false, detail: e.message });
+    }
+  }
+  
+  console.log('=== STORAGE DIAGNOSTIC END ===');
+  
+  // Build result HTML
+  let html = '<div style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:8px;padding:16px;margin:12px 0;font-size:13px;line-height:1.8">';
+  html += '<h3 style="margin-bottom:10px">🔍 存储系统诊断报告</h3>';
+  let allOk = true;
+  results.forEach(r => {
+    const icon = r.ok ? '✅' : '❌';
+    if (!r.ok) allOk = false;
+    html += '<div>' + icon + ' <strong>' + r.step + '</strong>: ' + r.detail + '</div>';
+  });
+  html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #d0d7de;font-weight:bold">';
+  html += allOk ? '✅ 所有检测通过！可以正常上传文件' : '❌ 存在 ' + results.filter(r => !r.ok).length + ' 个问题，请根据提示修复';
+  html += '</div></div>';
+  
+  // Show in a modal
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;justify-content:center;align-items:center';
+  overlay.onclick = function(e) { if(e.target===this) this.remove(); };
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:12px;padding:24px;max-width:600px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.15);margin:20px';
+  box.innerHTML = html + '<div style="text-align:right;margin-top:12px"><button onclick="this.closest(\'div[style*\').parentElement.remove()" style="padding:8px 20px;border:none;border-radius:6px;background:#1890ff;color:#fff;cursor:pointer">关闭</button></div>';
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
 }
 
 async function renderFiles() {
@@ -944,7 +1280,10 @@ async function renderFiles() {
   try {
     const { data: fileData } = await sb.from('file_metadata').select('*, uploaded_by_profile:profiles!uploaded_by(name)').order('uploaded_at', { ascending: false });
     files = fileData || [];
-  } catch(e) { files = []; }
+  } catch(e) { 
+    console.warn('[Files] Load error:', e);
+    files = []; 
+  }
 
   let html = '<h2 style="margin-bottom:8px;display:flex;align-items:center;gap:8px">📁 文件仓库</h2>';
 
@@ -957,12 +1296,16 @@ async function renderFiles() {
     '</div>';
   }
 
-  html += '<div class="file-categories">';
+  html += '<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">';
+  html += '<div class="file-categories" style="flex:1;margin-bottom:0">';
   categories.forEach(c => {
     const count = c === '全部' ? files.length : files.filter(f => f.category === c).length;
     const catVal = c === '全部' ? '' : c;
     html += `<button class="${activeFileCategory === c || (c==='全部' && !activeFileCategory)?'active':''}" onclick="activeFileCategory='${catVal}';renderFiles()">${catIcons[c]||'📁'} ${c} (${count})</button>`;
   });
+  html += '</div>';
+  // Add diagnostic button
+  html += '<button onclick="testStorageSystem()" style="white-space:nowrap;padding:6px 14px;border:1px solid #d9d9d9;border-radius:20px;background:#fff;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px">🔍 诊断</button>';
   html += '</div>';
 
   const filtered = activeFileCategory ? files.filter(f => f.category === activeFileCategory) : files;
@@ -976,8 +1319,8 @@ async function renderFiles() {
       const size = f.file_size > 1024*1024 ? (f.file_size/1024/1024).toFixed(1)+' MB' : (f.file_size/1024).toFixed(1)+' KB';
       const uploader = f.uploaded_by_profile?.name || '未知';
       const date = new Date(f.uploaded_at).toLocaleDateString('zh-CN');
-      const safeName = (f.original_name||'').replace(/'/g,'%27');
-      const safePath = (f.storage_path||'').replace(/'/g,'%27');
+      const safeName = (f.original_name||'').replace(/'/g,'%27').replace(/"/g,'&quot;');
+      const safePath = (f.storage_path||'').replace(/'/g,'%27').replace(/"/g,'&quot;');
       html += '<div class="file-card">' +
         '<div class="icon">'+icon+'</div>' +
         '<div class="fname" title="'+(f.original_name||'')+'">'+(f.original_name||'')+'</div>' +
@@ -996,7 +1339,8 @@ async function renderFiles() {
 
 function handleDrop(e) {
   e.preventDefault();
-  document.getElementById('uploadArea').classList.remove('dragover');
+  const area = document.getElementById('uploadArea');
+  if (area) area.classList.remove('dragover');
   if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
 }
 
@@ -1004,80 +1348,182 @@ let _pendingUploadFile = null;
 
 async function uploadFile(file) {
   if (!file) return;
-  if (!sbStorage) initStorage();
   _pendingUploadFile = file;
-  document.getElementById('fileCatModal').classList.add('active');  // Show category picker
+  document.getElementById('fileCatModal').classList.add('active');
 }
 
 async function doUploadWithCategory(cat) {
   const file = _pendingUploadFile;
   _pendingUploadFile = null;
   if (!file || !cat) return;
-  if (!sbStorage) initStorage();
+  if (file.size > 50 * 1024 * 1024) {
+    return showToast('❌ 文件超过50MB限制','error');
+  }
+  if (!currentUser) return showToast('❌ 用户未登录','error');
 
   const folderMap = {'项目立项文件':'project_docs','执行标准':'standards','会议纪要':'meeting_minutes','周期性报告':'periodic_reports','其他':'other'};
-  const safeName = file.name.replace(/[^a-zA-Z0-9.-\u4e00-\u9fff]/g, '_').replace(/_+/g, '_').substring(0, 100);
+  // Remove special chars (Supabase Storage doesn't accept Chinese in keys)
+  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_').replace(/_+/g, '_').substring(0, 100);
   const path = (folderMap[cat]||'other') + '/' + Date.now() + '_' + safeName;
+  
+  // Show an inline error panel for detailed diagnostics
+  showToast('⏳ 上传中 (尝试3种方式)...','info');
+  
+  // Collect all errors
+  const errors = [];
+  
+  // =========== STRATEGY 1: SDK upload ===========
   try {
-    showToast('⏳ 上传中...','info');
-    const { error: uploadErr } = await sbStorage.from('project_files').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
-    if (uploadErr) throw uploadErr;
-
-    const { error: metaErr } = await sb.from('file_metadata').insert({
-      filename: path,
-      original_name: file.name,
-      file_size: file.size,
-      mime_type: file.type || 'application/octet-stream',
-      storage_path: path,
-      category: cat,
-      uploaded_by: currentUser.id
+    console.log('[Upload] Strategy 1: SDK upload');
+    const { error: sdkErr } = await sb.storage.from('project_files').upload(path, file, { 
+      upsert: false, 
+      contentType: file.type || 'application/octet-stream' 
     });
-    if (metaErr) {
-      await sbStorage.from('project_files').remove([path]);
-      throw metaErr;
+    if (!sdkErr) {
+      console.log('[Upload] Strategy 1 SUCCESS');
+      // Record metadata
+      await _recordMetadata(path, file, cat);
+      return;
     }
-    showToast('✅ 上传成功','success');
-    await logAction('上传文件', file.name + ' → ' + cat);
-    renderFiles();
+    console.warn('[Upload] Strategy 1 failed:', sdkErr.message);
+    errors.push('SDK方式: ' + sdkErr.message);
   } catch(e) {
-    showToast('❌ 上传失败: ' + (e.message || e),'error');
+    console.warn('[Upload] Strategy 1 exception:', e.message);
+    errors.push('SDK方式异常: ' + e.message);
   }
-}
-
-async function downloadFile(id, originalName, storagePath) {
+  
+  // =========== STRATEGY 2: Raw fetch with FormData ===========
   try {
-    const { data, error } = await sbStorage.from('project_files').download(storagePath);
-    if (error) throw error;
-    const url = URL.createObjectURL(data);
-    const a = document.createElement('a');
-    a.href = url; a.download = originalName; a.click();
-    URL.revokeObjectURL(url);
-    await logAction('下载文件', originalName);
+    console.log('[Upload] Strategy 2: raw fetch + FormData');
+    const token = await getAccessToken();
+    if (!token) { errors.push('无法获取JWT令牌'); throw new Error('No token'); }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const resp = await fetch(encodeURI(SUPABASE_URL + '/storage/v1/object/project_files/' + path), {
+      method: 'POST',
+      headers: { 
+        'Authorization': 'Bearer ' + token,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: formData
+    });
+    
+    if (resp.ok) {
+      console.log('[Upload] Strategy 2 SUCCESS');
+      await _recordMetadata(path, file, cat);
+      return;
+    }
+    
+    const errText = await resp.text();
+    errors.push('FormData方式 HTTP ' + resp.status + ': ' + errText.substring(0, 200));
+    console.warn('[Upload] Strategy 2 failed:', resp.status, errText);
   } catch(e) {
-    showToast('❌ 下载失败: ' + (e.message || e),'error');
+    errors.push('FormData方式异常: ' + e.message);
+    console.warn('[Upload] Strategy 2 exception:', e.message);
   }
-}
-
-async function deleteFile(id) {
-  if (!confirm('确定要删除这个文件吗？')) return;
+  
+  // =========== STRATEGY 3: Raw fetch with file bytes directly ===========
   try {
-    const f = files.find(x => x.id === id);
-    if (!f) throw new Error('文件不存在');
-    const { error: storageErr } = await sbStorage.from('project_files').remove([f.storage_path]);
-    if (storageErr) throw storageErr;
-    const { error: metaErr } = await sb.from('file_metadata').delete().eq('id', id);
-    if (metaErr) throw metaErr;
-    showToast('✅ 已删除','success');
-    await logAction('删除文件', f.original_name);
-    renderFiles();
+    console.log('[Upload] Strategy 3: raw fetch + file bytes');
+    const token = await getAccessToken();
+    if (!token) { errors.push('无法获取JWT令牌'); throw new Error('No token'); }
+    
+    const resp = await fetch(encodeURI(SUPABASE_URL + '/storage/v1/object/project_files/' + path), {
+      method: 'POST',
+      headers: { 
+        'Authorization': 'Bearer ' + token,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': file.type || 'application/octet-stream'
+      },
+      body: file
+    });
+    
+    if (resp.ok) {
+      console.log('[Upload] Strategy 3 SUCCESS');
+      await _recordMetadata(path, file, cat);
+      return;
+    }
+    
+    const errText = await resp.text();
+    errors.push('直传方式 HTTP ' + resp.status + ': ' + errText.substring(0, 200));
+    console.warn('[Upload] Strategy 3 failed:', resp.status, errText);
   } catch(e) {
-    showToast('❌ 删除失败: ' + (e.message || e),'error');
+    errors.push('直传方式异常: ' + e.message);
+    console.warn('[Upload] Strategy 3 exception:', e.message);
   }
+  
+  // =========== ALL STRATEGIES FAILED ===========
+  const fullError = errors.join('\n---\n');
+  console.error('[Upload] ALL strategies failed:', errors);
+  
+  // Show detailed error panel
+  _showUploadError(path, errors);
 }
 
-// ============================================================
-// FILE CATEGORY MODAL
-// ============================================================
+// Record file metadata to database
+async function _recordMetadata(path, file, cat) {
+  const { error: metaErr } = await sb.from('file_metadata').insert({
+    filename: path,
+    original_name: file.name,
+    file_size: file.size,
+    mime_type: file.type || 'application/octet-stream',
+    storage_path: path,
+    category: cat,
+    uploaded_by: currentUser.id
+  });
+  
+  if (metaErr) {
+    console.error('[Upload] Metadata insert failed:', metaErr);
+    showToast('❌ 文件已上传但记录数据库失败: ' + (metaErr.message || '').substring(0, 100),'error');
+    return;
+  }
+  
+  showToast('✅ 上传成功','success');
+  try { await logAction('上传文件', file.name + ' → ' + cat); } catch(e) {}
+  renderFiles();
+}
+
+// Show detailed error panel with full Supabase response
+function _showUploadError(path, errors) {
+  // Build error detail HTML
+  let html = '<div style="background:#fff2f0;border:1px solid #ffccc7;border-radius:8px;padding:16px;margin:12px 0;font-size:13px;line-height:1.8">';
+  html += '<h3 style="color:#ff4d4f;margin-bottom:8px">❌ 上传失败 - 详细诊断</h3>';
+  
+  // Add solution suggestions
+  html += '<div style="background:#fff7e6;border:1px solid #ffd591;border-radius:6px;padding:10px;margin-bottom:10px;font-size:12px">';
+  html += '<strong>💡 常见原因和解决方案：</strong><br>';
+  html += '1. 没有在Supabase SQL Editor运行 init_database.sql → 请运行一次<br>';
+  html += '2. 项目可能尚未开启Storage功能 → 检查Supabase项目设置中Storage是否启用<br>';
+  html += '3. 浏览器缓存问题 → 按 Ctrl+Shift+R (Windows) 或 Cmd+Shift+R (Mac) 强制刷新<br>';
+  html += '4. 权限问题 → 检查你的用户角色是否为 admin 或 super_admin<br>';
+  html += '</div>';
+  
+  html += '<div style="background:#1e1e1e;color:#fff;padding:12px;border-radius:6px;font-family:monospace;font-size:11px;white-space:pre-wrap;max-height:300px;overflow-y:auto">';
+  html += '📁 ' + path + '\n\n';
+  html += '尝试了3种上传方式，全部失败:\n\n';
+  errors.forEach((err, i) => {
+    html += '方式 ' + (i+1) + ': ' + err + '\n';
+  });
+  html += '\n---\n请把以上错误信息复制给开发者';
+  html += '</div>';
+  html += '<div style="margin-top:8px"><button onclick="this.parentElement.parentElement.remove()" style="padding:6px 14px;border:none;border-radius:4px;background:#ff4d4f;color:#fff;cursor:pointer;font-size:12px">关闭</button></div>';
+  html += '</div>';
+  
+  // Show as overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;justify-content:center;align-items:center';
+  overlay.onclick = function(e) { if(e.target===this) this.remove(); };
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:12px;padding:20px;max-width:650px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.15);margin:20px';
+  box.innerHTML = html;
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  
+  // Also show a toast
+  showToast('❌ 上传失败，点击右上角🔍诊断查看详情','error');
+}
 function pickFileCat(cat) {
   closeFileCatModal();
   if (window._fileCatResolve) {
