@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OGD 分销拓展项目 - 团队协作版</title>
+<title>项目管理系统 v2.0.0</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -220,6 +220,11 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 .file-upload-area:hover{border-color:#1890ff;background:#f0f8ff}
 .file-upload-area.dragover{border-color:#1890ff;background:#e6f7ff}
 @media print{.tab-bar,.toolbar,.user-info button,.permission-notice,.ms-bar{display:none}}
+
+/* Project Selector */
+#projectSelector{padding:4px 8px;border:1px solid #d9d9d9;border-radius:6px;font-size:12px;max-width:200px;background:#fafafa;cursor:pointer}
+#projectSelector:focus{border-color:#1890ff;outline:none}
+#projectSelector option{padding:4px}
 </style>
 </head>
 <body>
@@ -243,7 +248,12 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 <!-- App -->
 <div id="appMain" class="hide">
   <div class="app-header">
-    <h1>🏗️ OGD 分销拓展项目 <small>团队协作版</small></h1>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <h1>🏗️ 项目管理系统 <small>v2.0.0</small></h1>
+      <select id="projectSelector" onchange="switchProject(this.value)" style="padding:4px 8px;border:1px solid #d9d9d9;border-radius:6px;font-size:12px;max-width:200px;background:#fafafa;cursor:pointer" title="切换项目">
+        <option value="">加载中...</option>
+      </select>
+    </div>
     <div class="user-info">
       <span id="userName"></span>
       <span id="userBadge" class="user-badge"></span>
@@ -349,6 +359,9 @@ let currentUser = null;      // { id, email, name, company, role }
 let tasks = [];
 let editIdx = -1;
 let msOnly = false;
+let projects = [];          // 用户可见的项目列表
+let currentProject = null;  // 当前选中的项目
+
 const CELL_W = 34;
 const PHASE_ORDER = ["准备阶段","项目实施","实施阶段","回顾阶段"];
 const PHASE_COLORS = {"准备阶段":"#52c41a","项目实施":"#faad14","实施阶段":"#1890ff","回顾阶段":"#722ed1"};
@@ -554,6 +567,7 @@ async function loadProfile(user) {
     document.getElementById('filesTabBtn').classList.remove('hide');
     
     showApp();
+    await loadProjects();
     await loadTasks();
     
     // Restore saved tab
@@ -610,8 +624,186 @@ function showAdminPanel() { switchTab('admin'); }
 // ============================================================
 // DATA OPERATIONS
 // ============================================================
+
+// ============================================================
+// PROJECT MANAGEMENT — v2.0.0
+// ============================================================
+async function loadProjects() {
+  if (!sb || !currentUser) return;
+  try {
+    const { data, error } = await sb.from('projects').select('*').order('sort_order');
+    if (error) throw error;
+    projects = data || [];
+    
+    // Restore last selected project from localStorage
+    const savedId = localStorage.getItem('ogd_project_id');
+    let target = null;
+    if (savedId) target = projects.find(p => p.id === parseInt(savedId));
+    if (!target && projects.length > 0) target = projects[0];
+    
+    renderProjectSelector(target);
+  } catch(e) {
+    console.warn('[Projects] Load error:', e.message);
+    projects = [];
+    renderProjectSelector(null);
+  }
+}
+
+function renderProjectSelector(active) {
+  const sel = document.getElementById('projectSelector');
+  if (!sel) return;
+  let html = '';
+  projects.forEach((p, i) => {
+    const isArchived = p.status === 'archived';
+    html += `<option value="${p.id}" ${active && active.id === p.id ? 'selected' : ''} ${isArchived ? 'style="color:#999"' : ''}>${isArchived ? '📦 ' : ''}${p.name}${p.description ? ' - ' + p.description : ''}</option>`;
+  });
+  if (projects.length === 0) {
+    html = '<option value="">暂无可用项目</option>';
+  }
+  sel.innerHTML = html;
+  
+  if (active) {
+    currentProject = active;
+    localStorage.setItem('ogd_project_id', active.id);
+    loadTasks();
+  }
+}
+
+async function switchProject(projectId) {
+  if (!projectId) { currentProject = null; tasks = []; renderGantt(); return; }
+  const p = projects.find(x => x.id === parseInt(projectId));
+  if (!p) return;
+  currentProject = p;
+  localStorage.setItem('ogd_project_id', p.id);
+  await loadTasks();
+  // Refresh files for the new project
+  if (document.getElementById('tabFiles').classList.contains('hide') === false) {
+    renderFiles();
+  }
+  showToast('📋 已切换到: ' + p.name, 'info');
+}
+
+// ============================================================
+// PROJECT CRUD — super_admin only
+// ============================================================
+function showCreateProject() {
+  document.getElementById('cpName').value = '';
+  document.getElementById('cpDesc').value = '';
+  document.getElementById('createProjectModal').classList.add('active');
+}
+
+async function createProject() {
+  const name = document.getElementById('cpName').value.trim();
+  const desc = document.getElementById('cpDesc').value.trim();
+  if (!name) return showToast('请输入项目名称','error');
+  if (!currentUser) return showToast('请先登录','error');
+  
+  try {
+    const { data, error } = await sb.from('projects').insert({
+      name: name,
+      description: desc,
+      company: '',
+      status: 'active',
+      created_by: currentUser.id,
+      sort_order: projects.length + 1
+    }).select().single();
+    
+    if (error) throw error;
+    if (!data) throw new Error('创建失败：未返回数据');
+    
+    // Add creator as project admin
+    await sb.from('project_members').insert({
+      project_id: data.id,
+      user_id: currentUser.id,
+      role_in_project: 'admin'
+    });
+    
+    showToast('✅ 项目 "' + name + '" 已创建','success');
+    document.getElementById('createProjectModal').classList.remove('active');
+    await loadProjects();
+    await switchProject(data.id);
+  } catch(e) {
+    showToast('❌ 创建失败: ' + (e.message || '').substring(0, 100),'error');
+  }
+}
+
+async function archiveProject(projectId) {
+  const p = projects.find(x => x.id === projectId);
+  if (!p || !confirm('确定要归档项目 "' + p.name + '" 吗？归档后成员将无法操作该项目。')) return;
+  try {
+    const { error } = await sb.from('projects').update({ status: 'archived' }).eq('id', projectId);
+    if (error) throw error;
+    showToast('📦 项目 "' + p.name + '" 已归档','success');
+    await loadProjects();
+    if (currentProject && currentProject.id === projectId) {
+      // Switch to the first available project
+      if (projects.length > 0) {
+        await switchProject(projects[0].id);
+      }
+    }
+  } catch(e) {
+    showToast('❌ 归档失败: ' + (e.message || '').substring(0, 100),'error');
+  }
+}
+
+async function activateProject(projectId) {
+  try {
+    const { error } = await sb.from('projects').update({ status: 'active' }).eq('id', projectId);
+    if (error) throw error;
+    showToast('✅ 项目已恢复','success');
+    await loadProjects();
+  } catch(e) {
+    showToast('❌ 恢复失败: ' + (e.message || '').substring(0, 100),'error');
+  }
+}
+
+async function deleteProject(projectId) {
+  const p = projects.find(x => x.id === projectId);
+  if (!p || !confirm('⚠️ 确定要永久删除项目 "' + p.name + '" 吗？
+此操作不可撤销！所有关联任务、文件、日志将被清空。')) return;
+  if (!confirm('再次确认：项目 "' + p.name + '" 将被永久删除！')) return;
+  try {
+    const { error } = await sb.from('projects').delete().eq('id', projectId);
+    if (error) throw error;
+    showToast('🗑️ 项目 "' + p.name + '" 已删除','info');
+    await loadProjects();
+    if (projects.length > 0) await switchProject(projects[0].id);
+  } catch(e) {
+    showToast('❌ 删除失败: ' + (e.message || '').substring(0, 100),'error');
+  }
+}
+
+// Project member management
+async function addProjectMember(projectId, userId, role) {
+  try {
+    const { error } = await sb.from('project_members').insert({
+      project_id: projectId,
+      user_id: userId,
+      role_in_project: role || 'member'
+    });
+    if (error) throw error;
+    showToast('✅ 成员已添加','success');
+  } catch(e) {
+    showToast('❌ 添加失败: ' + (e.message || '').substring(0, 100),'error');
+  }
+}
+
+async function removeProjectMember(pmId) {
+  if (!confirm('确定移除此成员？')) return;
+  try {
+    const { error } = await sb.from('project_members').delete().eq('id', pmId);
+    if (error) throw error;
+    showToast('✅ 成员已移除','success');
+  } catch(e) {
+    showToast('❌ 移除失败: ' + (e.message || '').substring(0, 100),'error');
+  }
+}
+
 async function loadTasks() {
-  const { data } = await sb.from('tasks').select('*').order('id');
+  if (!currentProject) { tasks = []; renderGantt(); return; }
+  let query = sb.from('tasks').select('*').eq('project_id', currentProject.id).order('id');
+  // Super admin and company admin can see cross-company tasks for the project
+  const { data } = await query;
   if (data) tasks = data;
   renderGantt();
 }
@@ -646,7 +838,8 @@ async function logAction(action, detail) {
       user_name: currentUser.name || currentUser.email,
       company: currentUser.company,
       action: action,
-      detail: detail
+      detail: detail,
+      project_id: currentProject ? currentProject.id : null
     });
     if (error) console.warn('[LogAction] 记录失败:', error.message);
   } catch(e) {}
@@ -794,8 +987,9 @@ async function addTask() {
   if (!canEdit('嘉顿')&&!canEdit('ECS')) return showToast('⛔ 你没有权限添加任务','error');
   try {
     const company = currentUser.company || 'ECS';
-    const { data, error } = await sb.from('tasks').insert({
-      phase:'准备阶段', content:'新任务', deliverable:'双击编辑', company:company,
+    if (!currentProject) return showToast('⛔ 请先选择项目','error');
+  const { data, error } = await sb.from('tasks').insert({
+      project_id: currentProject.id, phase:'准备阶段', content:'新任务', deliverable:'双击编辑', company:company,
       responsible:'', status:'', milestone:false
     }).select().single();
     if(error) return showToast('❌ 添加失败: '+error.message,'error');
@@ -879,6 +1073,37 @@ async function renderAdmin() {
   
   let html = '';
   
+  
+  // --- Project Management (super_admin only) ---
+  if (isSuper) {
+    html += '<div class="admin-section"><h2>📂 项目管理</h2>';
+    
+    // Create project button
+    html += '<button onclick="showCreateProject()" style="padding:8px 16px;background:#1890ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:12px">➕ 新建项目</button>';
+    
+    // Load all projects for admin view
+    const { data: allProjects } = await sb.from('projects').select('*').order('sort_order');
+    
+    if (allProjects && allProjects.length) {
+      html += '<table class="member-table"><tr><th>项目名称</th><th>描述</th><th>状态</th><th>创建时间</th><th>操作</th></tr>';
+      for (const prj of allProjects) {
+        html += '<tr>' +
+          '<td><strong>' + prj.name + '</strong></td>' +
+          '<td style="color:#888;font-size:12px">' + (prj.description || '—') + '</td>' +
+          '<td>' + (prj.status === 'active' ? '<span style="color:#52c41a">✅ 进行中</span>' : '<span style="color:#999">📦 已归档</span>') + '</td>' +
+          '<td style="color:#999;font-size:12px">' + (prj.created_at ? new Date(prj.created_at).toLocaleDateString('zh-CN') : '—') + '</td>' +
+          '<td>' +
+          (prj.status === 'active' ? '<button onclick="archiveProject(' + prj.id + ')" style="font-size:11px;padding:2px 8px;border:1px solid #faad14;border-radius:4px;background:#fff;color:#ad6800;cursor:pointer">📦 归档</button> ' : '<button onclick="activateProject(' + prj.id + ')" style="font-size:11px;padding:2px 8px;border:1px solid #52c41a;border-radius:4px;background:#fff;color:#237804;cursor:pointer">✅ 恢复</button> ') +
+          (prj.status === 'archived' ? '<button onclick="deleteProject(' + prj.id + ')" style="font-size:11px;padding:2px 8px;border:1px solid #ff4d4f;border-radius:4px;background:#fff;color:#ff4d4f;cursor:pointer">🗑️ 删除</button>' : '') +
+          '</td></tr>';
+      }
+      html += '</table>';
+    } else {
+      html += '<p style="color:#999;font-size:13px">暂无项目，点击上方按钮创建</p>';
+    }
+    html += '</div>';
+  }
+
   // Invite form (company admins can invite to their company, super admin can pick)
   html += `<div class="admin-section"><h2>📧 邀请团队成员</h2>
     <div class="invite-form">
@@ -1278,7 +1503,7 @@ async function renderFiles() {
   const catIcons = {'项目立项文件':'📋','执行标准':'📐','会议纪要':'📝','周期性报告':'📊','其他':'📁'};
 
   try {
-    const { data: fileData } = await sb.from('file_metadata').select('*, uploaded_by_profile:profiles!uploaded_by(name)').order('uploaded_at', { ascending: false });
+    const { data: fileData } = await sb.from('file_metadata').select('*, uploaded_by_profile:profiles!uploaded_by(name)').eq('project_id', currentProject ? currentProject.id : 0).order('uploaded_at', { ascending: false });
     files = fileData || [];
   } catch(e) { 
     console.warn('[Files] Load error:', e);
@@ -1471,6 +1696,7 @@ async function _recordMetadata(path, file, cat) {
     mime_type: file.type || 'application/octet-stream',
     storage_path: path,
     category: cat,
+    project_id: currentProject ? currentProject.id : null,
     uploaded_by: currentUser.id
   });
   
@@ -1617,6 +1843,23 @@ init();
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button onclick="closeFileCatModal()" style="padding:8px 20px;border:1px solid #d9d9d9;border-radius:6px;background:#fff;cursor:pointer">取消</button>
         <button onclick="pickFileCat(document.getElementById('fileCatSelect').value)" style="padding:8px 20px;border:none;border-radius:6px;background:#1890ff;color:#fff;cursor:pointer">确认上传</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Create Project Modal -->
+  <div id="createProjectModal" class="modal-overlay" onclick="if(event.target===this)this.querySelector('.modal').classList.contains('active')?document.getElementById('createProjectModal').classList.remove('active'):0">
+    <div class="modal" style="max-width:400px">
+      <h3>📂 新建项目</h3>
+      <label>项目名称 *</label>
+      <input type="text" id="cpName" placeholder="输入项目名称" maxlength="50">
+      <label>项目描述</label>
+      <input type="text" id="cpDesc" placeholder="简短描述（选填）" maxlength="200">
+      <p style="font-size:12px;color:#888;margin-bottom:10px">项目创建后，超级管理员可以添加成员并分配权限。</p>
+      <div class="modal-btns">
+        <button onclick="document.getElementById('createProjectModal').classList.remove('active')" class="btn-cancel">取消</button>
+        <button onclick="createProject()" class="btn-ok">✅ 创建项目</button>
       </div>
     </div>
   </div>
