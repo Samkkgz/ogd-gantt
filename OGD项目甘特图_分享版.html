@@ -1,0 +1,780 @@
+<html lang="zh-CN"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OGD 分销拓展项目 - 甘特图</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: #f5f7fa; padding: 20px; color: #333; }
+  .container { max-width: 98vw; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 small { font-size: 14px; font-weight: normal; color: #666; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 12px; }
+
+  .save-guide { background: #e6f7ff; border: 1px solid #91d5ff; border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; font-size: 13px; }
+  .save-guide h3 { font-size: 14px; color: #003a8c; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .save-guide .steps { display: flex; gap: 16px; flex-wrap: wrap; }
+  .save-guide .step { display: flex; align-items: flex-start; gap: 6px; flex:1; min-width:160px; }
+  .save-guide .step-num { background:#1890ff; color:#fff; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; margin-top:1px; }
+  .save-guide .step-body { font-size:12px; line-height:1.4; }
+  .save-guide code { background:#f0f5ff; padding:1px 5px; border-radius:3px; font-size:11px; }
+
+  .persist-info { background:#fffbe6; border:1px solid #ffe58f; border-radius:8px; padding:8px 14px; margin-bottom:10px; font-size:13px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+  .badge-green { background:#d9f7be; color:#237804; }
+  .badge-orange { background:#fff7b3; color:#ad6800; }
+
+  .toolbar { display:flex; gap:6px; margin-bottom:10px; align-items:center; flex-wrap:wrap; }
+  .toolbar button { padding:6px 12px; border:none; border-radius:6px; cursor:pointer; font-size:12px; transition:all .2s; white-space:nowrap; }
+  .toolbar button:hover { filter:brightness(1.1); transform:translateY(-1px); }
+  .btn-primary { background:#1890ff; color:#fff; }
+  .btn-success { background:#52c41a; color:#fff; }
+  .btn-warning { background:#faad14; color:#fff; }
+  .btn-danger { background:#ff4d4f; color:#fff; }
+  .btn-purple { background:#722ed1; color:#fff; }
+  .btn-ghost { background:#f0f0f0; color:#555; }
+  .btn-ghost:hover { background:#d9d9d9; }
+  .sep { width:1px; height:26px; background:#e0e0e0; margin:0 4px; flex-shrink:0; }
+  .legend { display:flex; gap:10px; font-size:11px; align-items:center; flex-wrap:wrap; }
+  .legend-item { display:flex; align-items:center; gap:3px; }
+  .legend-color { width:14px; height:10px; border-radius:2px; flex-shrink:0; }
+
+  .milestone-bar { background:linear-gradient(135deg,#fff0f6,#f9f0ff); border:1px solid #ffadd2; border-radius:10px; padding:10px 14px; margin-bottom:10px; }
+  .milestone-bar h3 { font-size:13px; color:#eb2f96; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .milestone-bar h3 .count { font-size:11px; background:#eb2f96; color:#fff; border-radius:10px; padding:0 7px; line-height:18px; }
+  .milestone-timeline { display:flex; gap:3px; overflow-x:auto; padding-bottom:3px; }
+  .ms-item { display:flex; flex-direction:column; align-items:center; min-width:64px; max-width:80px; cursor:pointer; padding:3px 5px; border-radius:6px; position:relative; flex-shrink:0; }
+  .ms-item:hover { background:rgba(235,47,150,.06); }
+  .ms-item .ms-diamond { font-size:14px; line-height:1; color:#eb2f96; }
+  .ms-item .ms-date { font-size:9px; color:#999; }
+  .ms-item .ms-label { font-size:10px; color:#333; text-align:center; line-height:1.2; font-weight:500; }
+  .ms-item .ms-phase { font-size:8px; color:#aaa; }
+  .ms-item .ms-line { position:absolute; top:50%; right:-3px; width:3px; height:1px; background:#ffadd2; }
+  .ms-item:last-child .ms-line { display:none; }
+
+  .gantt-wrapper { overflow:auto; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,.08); max-height:78vh; }
+  table { border-collapse:separate; border-spacing:0; background:#fff; font-size:13px; }
+  th, td { border:1px solid #e8e8e8; padding:0; vertical-align:middle; position:relative; }
+  th { background:#fafafa; font-weight:600; font-size:12px; color:#555; text-align:center; position:sticky; top:0; z-index:20; }
+  .gantt-header + .gantt-header th { top:32px; }
+
+  /* Column classes for sticky positioning only — widths set by JS */
+  .col-phase { }
+  .col-content { }
+  .col-deliverable { }
+  .col-company { }
+  .col-responsible { }
+  .col-status { }
+  .col-milestone { }
+
+  /* Header frozen cells need both top & left sticky */
+  thead .col-phase { left:0; z-index:31; }
+  thead .col-content { z-index:31; }
+  thead .col-deliverable { z-index:31; }
+  thead .col-company { z-index:31; }
+  thead .col-responsible { z-index:31; }
+  thead .col-status { z-index:31; }
+  thead .col-milestone { z-index:31; }
+
+  /* Body frozen cells */
+  td.phase-label { position:sticky; left:0; z-index:10; }
+  td.content-label { position:sticky; z-index:10; }
+  td.deliverable-label { position:sticky; z-index:10; }
+  td.company-label { position:sticky; z-index:10; }
+  td.responsible-label { position:sticky; z-index:10; }
+  td.col-status-data { position:sticky; z-index:10; }
+  td.ms-check { position:sticky; z-index:10; text-align:center; padding:4px; cursor:pointer; font-size:16px; transition:all .2s; line-height:1; }
+  td.ms-check:hover { transform:scale(1.2); }
+  td.ms-check.active { color:#eb2f96; }
+  td.ms-check.inactive { color:#d9d9d9; }
+
+  /* Row backgrounds */
+  .row-prep td { background:#f6ffed; }
+  .row-launch td { background:#fff7e6; }
+  .row-exec td { background:#e6f7ff; }
+  .row-review td { background:#f9f0ff; }
+  .row-milestone td { background:#fff0f6; }
+  .row-prep td.phase-label { background:#d9f7be; }
+  .row-launch td.phase-label { background:#ffe58f; }
+  .row-exec td.phase-label { background:#91d5ff; }
+  .row-review td.phase-label { background:#d3adf7; }
+  .row-milestone td.phase-label { background:#ffadd2; }
+
+  tr:hover td.phase-label,
+  tr:hover td.content-label,
+  tr:hover td.deliverable-label,
+  tr:hover td.company-label,
+  tr:hover td.responsible-label,
+  tr:hover td.col-status-data,
+  tr:hover td.ms-check { filter:brightness(0.97); }
+  tr:hover td .row-actions { opacity:1; }
+
+  .phase-label { font-weight:700; writing-mode:vertical-lr; letter-spacing:4px; font-size:14px; text-align:center; padding:8px 4px; min-height:60px; }
+  .content-label { padding:6px; font-weight:500; color:#555; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .deliverable-label { padding:6px; cursor:default; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .deliverable-label:hover { background:#f0f0f0; }
+  .company-label { padding:6px; text-align:center; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .responsible-label { padding:6px; text-align:center; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .status-badge { padding:2px 7px; border-radius:10px; font-size:11px; display:inline-block; white-space:nowrap; }
+  .status-done { background:#d9f7be; color:#237804; }
+  .status-progress { background:#fff7b3; color:#ad6800; }
+  .status-pending { background:#f0f0f0; color:#999; }
+
+  /* Delete button per row */
+  .row-actions { position:absolute; right:2px; top:2px; opacity:0; transition:opacity .2s; z-index:15; }
+  .row-actions button { background:none; border:none; cursor:pointer; font-size:14px; color:#ff4d4f; padding:2px; line-height:1; border-radius:3px; }
+  .row-actions button:hover { background:#fff1f0; }
+  td:hover .row-actions { opacity:1; }
+
+  .gantt-header th { background:#e6f0ff; padding:0; font-size:11px; color:#333; border-bottom:2px solid #91d5ff; }
+  .gantt-header th:not([class*="col-"]) { position:sticky; top:0; z-index:15; }
+
+  /* Resize handle */
+  .resize-handle { position:absolute; right:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:35; background:transparent; }
+  .resize-handle:hover, .resize-handle.active { background:rgba(24,144,255,.3); }
+
+  .bar { position:absolute; height:20px; border-radius:4px; top:6px; cursor:pointer; transition:all .15s; display:flex; align-items:center; justify-content:center; font-size:10px; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .bar:hover { filter:brightness(1.1); transform:translateY(-1px); box-shadow:0 2px 6px rgba(0,0,0,.15); }
+  .bar-milestone { background:linear-gradient(135deg,#eb2f96,#722ed1) !important; box-shadow:0 1px 4px rgba(235,47,150,.3); border:1px solid rgba(235,47,150,.3); }
+  .bar-milestone::before { content:"◆ "; font-size:10px; }
+  .gantt-cell { position:relative; height:34px; min-width:100%; }
+  .today-line { position:absolute; top:0; bottom:0; width:2px; background:#ff4d4f; z-index:5; pointer-events:none; }
+  .today-label { position:absolute; top:-26px; left:50%; transform:translateX(-50%); font-size:9px; color:#ff4d4f; white-space:nowrap; }
+
+  .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.4); z-index:1000; justify-content:center; align-items:center; }
+  .modal-overlay.active { display:flex; }
+  .modal { background:#fff; border-radius:12px; padding:24px; min-width:420px; max-width:500px; box-shadow:0 8px 32px rgba(0,0,0,.15); margin:20px; max-height:90vh; overflow-y:auto; }
+  .modal h3 { margin-bottom:14px; font-size:16px; display:flex; align-items:center; gap:8px; }
+  .modal label { display:block; margin-bottom:3px; font-size:12px; color:#666; font-weight:500; }
+  .modal input, .modal select { width:100%; padding:7px 10px; border:1px solid #d9d9d9; border-radius:6px; font-size:13px; margin-bottom:10px; outline:none; }
+  .modal input:focus, .modal select:focus { border-color:#1890ff; box-shadow:0 0 0 2px rgba(24,144,255,.1); }
+  .modal .form-row { display:flex; gap:10px; }
+  .modal .form-row > div { flex:1; }
+  .modal .checkbox-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .modal .checkbox-row input[type=checkbox] { width:auto; margin:0; accent-color:#eb2f96; width:18px; height:18px; cursor:pointer; }
+  .modal .checkbox-row label { margin:0; cursor:pointer; font-size:14px; color:#eb2f96; font-weight:600; }
+  .modal-btns { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+  .modal-btns button { padding:7px 18px; border:none; border-radius:6px; cursor:pointer; font-size:13px; }
+  .modal-btns .btn-ok { background:#1890ff; color:#fff; }
+  .modal-btns .btn-ok:hover { background:#40a9ff; }
+  .modal-btns .btn-cancel { background:#f0f0f0; color:#555; }
+
+  .toast { position:fixed; top:16px; right:16px; z-index:2000; padding:10px 18px; border-radius:8px; font-size:13px; opacity:0; transform:translateY(-10px); transition:all .3s; pointer-events:none; max-width:340px; }
+  .toast.show { opacity:1; transform:translateY(0); }
+  .toast-info { background:#1890ff; color:#fff; }
+  .toast-success { background:#52c41a; color:#fff; }
+  .toast-error { background:#ff4d4f; color:#fff; }
+
+  .file-input-hidden { display:none; }
+  @media print { .toolbar,.persist-info,.save-guide,.milestone-bar { display:none; } }
+</style>
+<style id="colStyles">.col-phase{width:70px;min-width:70px;max-width:70px;}thead .col-phase{left:0px;}td.phase-label{left:0px;}.col-content{width:100px;min-width:100px;max-width:100px;}thead .col-content{left:70px;}td.content-label{left:70px;}.col-deliverable{width:170px;min-width:170px;max-width:170px;}thead .col-deliverable{left:170px;}td.deliverable-label{left:170px;}.col-company{width:55px;min-width:55px;max-width:55px;}thead .col-company{left:340px;}td.company-label{left:340px;}.col-responsible{width:85px;min-width:85px;max-width:85px;}thead .col-responsible{left:395px;}td.responsible-label{left:395px;}.col-status{width:55px;min-width:55px;max-width:55px;}thead .col-status{left:480px;}td.col-status-data{left:480px;}.col-milestone{width:40px;min-width:40px;max-width:40px;}thead .col-milestone{left:535px;}td.ms-check{left:535px;}td:nth-child(7){border-right:2px solid #91d5ff}</style></head>
+<body>
+
+<div class="container">
+  <h1>🏗️ OGD 分销拓展项目 — 甘特图 <small>Garden OGD ERTM Expansion Project</small></h1>
+  <div class="subtitle">◆粉紫=里程碑 · 冻结行列 · 双击编辑 · 拖拽列头调整宽度 · Ctrl+S保存</div>
+
+  <!-- Guide -->
+  <div class="save-guide">
+    <h3>📁 文件使用说明</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-body"><strong>文件位置</strong><br><code>outputs/OGD项目甘特图.html</code> — 独立文件，双击打开</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><strong>修改不丢失</strong><br>点「💾保存」或按<kbd>Ctrl+S</kbd>，关闭浏览器再打开数据还在</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><strong>分享团队</strong><br>点「📤导出HTML」得到新文件，最新数据已嵌入，直接发送</div></div>
+    </div>
+  </div>
+
+  <div class="persist-info" id="persistInfo"><span class="badge badge-green">💾 已保存</span><span>37项 · 1完成 · <span style="color:#eb2f96;font-weight:600">◆ 5里程碑</span></span><span style="color:#bbb">|</span><span>分享请点<strong>"📤导出HTML"</strong></span></div>
+  <div class="milestone-bar" id="milestoneBar">
+    <h3>◆ 项目里程碑 <span class="count" id="msCount">5</span></h3>
+    <div class="milestone-timeline" id="msTimeline"><div class="ms-item" onclick="scrollToRow('确定目标城市')" title="点击滚动">
+      <div class="ms-diamond" style="color:#52c41a">✅</div>
+      <div class="ms-date">6/2</div>
+      <div class="ms-label">确定目标城市</div>
+      <div class="ms-phase">准备阶段</div><div class="ms-line"></div></div><div class="ms-item" onclick="scrollToRow('AAM指标及衡量标准')" title="点击滚动">
+      <div class="ms-diamond" style="color:#eb2f96">◆</div>
+      <div class="ms-date">6/15</div>
+      <div class="ms-label">AAM指标及衡…</div>
+      <div class="ms-phase">准备阶段</div><div class="ms-line"></div></div><div class="ms-item" onclick="scrollToRow('完成合同签署')" title="点击滚动">
+      <div class="ms-diamond" style="color:#eb2f96">◆</div>
+      <div class="ms-date">6/30</div>
+      <div class="ms-label">完成合同签署</div>
+      <div class="ms-phase">准备阶段</div><div class="ms-line"></div></div><div class="ms-item" onclick="scrollToRow('项目正式启动')" title="点击滚动">
+      <div class="ms-diamond" style="color:#eb2f96">◆</div>
+      <div class="ms-date">7/10</div>
+      <div class="ms-label">项目正式启动</div>
+      <div class="ms-phase">项目实施</div><div class="ms-line"></div></div><div class="ms-item" onclick="scrollToRow('项目周期性评估（每月）')" title="点击滚动">
+      <div class="ms-diamond" style="color:#eb2f96">◆</div>
+      <div class="ms-date">8/10</div>
+      <div class="ms-label">项目周期性评估…</div>
+      <div class="ms-phase">回顾阶段</div></div></div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-success" onclick="saveToLocal()">💾 保存</button>
+    <button class="btn-primary" onclick="addTask()">➕ 新增任务</button>
+    <button class="btn-ghost" onclick="toggleMilestones()" id="msFilterBtn" style="">◆ 只看里程碑</button>
+    <div class="sep"></div>
+    <button class="btn-primary" onclick="exportHtml()">📤 导出HTML</button>
+    <button class="btn-purple" onclick="exportJson()">📋 导出JSON</button>
+    <button class="btn-warning" onclick="document.getElementById('importFile').click()">📂 导入JSON</button>
+    <input type="file" id="importFile" class="file-input-hidden" accept=".json" onchange="importJson(event)">
+    <div class="sep"></div>
+    <button class="btn-ghost" onclick="window.print()">🖨️ 打印/PDF</button>
+    <button class="btn-danger" onclick="if(confirm('重置为初始数据？')) resetData()">↺ 重置</button>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-color" style="background:#52c41a"></span>准备</span>
+      <span class="legend-item"><span class="legend-color" style="background:#faad14"></span>启动</span>
+      <span class="legend-item"><span class="legend-color" style="background:#1890ff"></span>实施</span>
+      <span class="legend-item"><span class="legend-color" style="background:#722ed1"></span>回顾</span>
+      <span class="legend-item"><span class="legend-color" style="background:linear-gradient(135deg,#eb2f96,#722ed1)"></span>◆里程碑</span>
+      <span style="color:#bbb;font-size:11px">| 拖拽列头↔调整宽度</span>
+    </div>
+  </div>
+
+  <div class="gantt-wrapper" id="ganttWrapper">
+    <table id="ganttTable">
+      <thead id="ganttHead"><tr class="gantt-header"><th class="col-phase">阶段<div class="resize-handle" data-col="phase" title="拖拽调整宽度"></div></th><th class="col-content">内容<div class="resize-handle" data-col="content" title="拖拽调整宽度"></div></th><th class="col-deliverable">产出<div class="resize-handle" data-col="deliverable" title="拖拽调整宽度"></div></th><th class="col-company">公司<div class="resize-handle" data-col="company" title="拖拽调整宽度"></div></th><th class="col-responsible">负责<div class="resize-handle" data-col="responsible" title="拖拽调整宽度"></div></th><th class="col-status">状态<div class="resize-handle" data-col="status" title="拖拽调整宽度"></div></th><th class="col-milestone">◆<div class="resize-handle" data-col="milestone" title="拖拽调整宽度"></div></th><th colspan="80" style="padding:0;border-left:2px solid #91d5ff"><div style="display:flex"><div style="flex:2;text-align:center;padding:4px 0;font-weight:700;color:#1890ff;font-size:12px;border-right:1px solid #e6f0ff">2026/05</div><div style="flex:30;text-align:center;padding:4px 0;font-weight:700;color:#1890ff;font-size:12px;border-right:1px solid #e6f0ff">2026/06</div><div style="flex:31;text-align:center;padding:4px 0;font-weight:700;color:#1890ff;font-size:12px;border-right:1px solid #e6f0ff">2026/07</div><div style="flex:17;text-align:center;padding:4px 0;font-weight:700;color:#1890ff;font-size:12px;border-right:1px solid #e6f0ff">2026/08</div></div></th></tr><tr class="gantt-header"><th colspan="7" style="border-right:2px solid #91d5ff"></th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">30</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">31</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">1</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">2</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">3</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">4</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">5</th><th style="color:#bbbbackground:#fff1f0;color:#ff4d4f;font-weight:700width:36px;min-width:36px;padding:3px 0;font-size:10px">6</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">7</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">8</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">9</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">10</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">11</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">12</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">13</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">14</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">15</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">16</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">17</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">18</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">19</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">20</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">21</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">22</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">23</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">24</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">25</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">26</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">27</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">28</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">29</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">30</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">1</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">2</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">3</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">4</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">5</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">6</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">7</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">8</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">9</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">10</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">11</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">12</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">13</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">14</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">15</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">16</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">17</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">18</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">19</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">20</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">21</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">22</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">23</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">24</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">25</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">26</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">27</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">28</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">29</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">30</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">31</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">1</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">2</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">3</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">4</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">5</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">6</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">7</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">8</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">9</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">10</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">11</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">12</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">13</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">14</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">15</th><th style="color:#bbbwidth:36px;min-width:36px;padding:3px 0;font-size:10px">16</th><th style="width:36px;min-width:36px;padding:3px 0;font-size:10px">17</th></tr></thead>
+      <tbody id="ganttBody"><tr class="row-milestone"><td class="phase-label phase-prep" rowspan="28">准备阶段</td><td class="content-label">业务机会分析</td><td class="deliverable-label" ondblclick="editItem(0)" title="双击编辑">◆ 确定目标城市</td><td class="company-label">嘉顿</td><td class="responsible-label">Lori</td><td class="company-label col-status-data"><span class="status-badge status-done">完成</span></td><td class="ms-check active" onclick="toggleMilestone(0)" title="取消里程碑">◆
+        <div class="row-actions"><button onclick="deleteTask(0)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-milestone" style="left:110px;width:32px;background:linear-gradient(135deg,#eb2f96,#722ed1)" ondblclick="editItem(0)" title="◆里程碑: 确定目标城市
+2026-06-02→2026-06-02
+负责人:Lori
+状态:完成"></div></div></td></tr><tr class="row-prep"><td class="content-label">业务机会分析</td><td class="deliverable-label" ondblclick="editItem(1)" title="双击编辑">渠道及门店清单</td><td class="company-label">ECS</td><td class="responsible-label">Lilia</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check inactive" onclick="toggleMilestone(1)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(1)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-progress" style="left:146px;width:464px;background:#faad14" ondblclick="editItem(1)" title="渠道及门店清单
+2026-06-03→2026-06-15
+负责人:Lilia
+状态:进行中">渠道及门店清..</div></div></td></tr><tr class="row-prep"><td class="content-label">业务机会分析</td><td class="deliverable-label" ondblclick="editItem(2)" title="双击编辑">确定目标门店清单</td><td class="company-label">嘉顿</td><td class="responsible-label">Lori/何纪辉</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(2)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(2)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:578px;width:572px;background:#52c41a" ondblclick="editItem(2)" title="确定目标门店清单
+2026-06-15→2026-06-30
+负责人:Lori/何纪辉
+状态:待开始">确定目标门店..</div></div></td></tr><tr class="row-prep"><td class="content-label">项目策略</td><td class="deliverable-label" ondblclick="editItem(3)" title="双击编辑">渠道及产品策略</td><td class="company-label">嘉顿</td><td class="responsible-label">Lim/Carlson制定，Lori确认</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check inactive" onclick="toggleMilestone(3)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(3)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-progress" style="left:146px;width:284px;background:#faad14" ondblclick="editItem(3)" title="渠道及产品策略
+2026-06-03→2026-06-10
+负责人:Lim/Carlson制定，Lori确认
+状态:进行中">渠道及产品策..</div></div></td></tr><tr class="row-prep"><td class="content-label">供应链流程</td><td class="deliverable-label" ondblclick="editItem(4)" title="双击编辑">确定供应链具体对接方案</td><td class="company-label">嘉顿</td><td class="responsible-label">蒋大方</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(4)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(4)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:326px;width:176px;background:#52c41a" ondblclick="editItem(4)" title="确定供应链具体对接方案
+2026-06-08→2026-06-12
+负责人:蒋大方
+状态:待开始">确定供应链具..</div></div></td></tr><tr class="row-prep"><td class="content-label">财务对接流程</td><td class="deliverable-label" ondblclick="editItem(5)" title="双击编辑">确定财务具体对接方案</td><td class="company-label">嘉顿</td><td class="responsible-label">张振兴</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(5)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(5)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:326px;width:176px;background:#52c41a" ondblclick="editItem(5)" title="确定财务具体对接方案
+2026-06-08→2026-06-12
+负责人:张振兴
+状态:待开始">确定财务具体..</div></div></td></tr><tr class="row-prep"><td class="content-label">项目目标</td><td class="deliverable-label" ondblclick="editItem(6)" title="双击编辑">确定分销产品清单</td><td class="company-label">嘉顿</td><td class="responsible-label">Lim/Carlson制定，Lori确认</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check inactive" onclick="toggleMilestone(6)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(6)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-progress" style="left:146px;width:284px;background:#faad14" ondblclick="editItem(6)" title="确定分销产品清单
+2026-06-03→2026-06-10
+负责人:Lim/Carlson制定，Lori确认
+状态:进行中">确定分销产品..</div></div></td></tr><tr class="row-prep"><td class="content-label">项目目标</td><td class="deliverable-label" ondblclick="editItem(7)" title="双击编辑">分销目标</td><td class="company-label">嘉顿</td><td class="responsible-label">Lori/何纪辉</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(7)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(7)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:578px;width:572px;background:#52c41a" ondblclick="editItem(7)" title="分销目标
+2026-06-15→2026-06-30
+负责人:Lori/何纪辉
+状态:待开始">分销目标</div></div></td></tr><tr class="row-prep"><td class="content-label">项目目标</td><td class="deliverable-label" ondblclick="editItem(8)" title="双击编辑">门店活跃率目标</td><td class="company-label">嘉顿</td><td class="responsible-label">Lori/何纪辉</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(8)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(8)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:578px;width:572px;background:#52c41a" ondblclick="editItem(8)" title="门店活跃率目标
+2026-06-15→2026-06-30
+负责人:Lori/何纪辉
+状态:待开始">门店活跃率目..</div></div></td></tr><tr class="row-prep"><td class="content-label">项目目标</td><td class="deliverable-label" ondblclick="editItem(9)" title="双击编辑">门店上翻目标</td><td class="company-label">嘉顿</td><td class="responsible-label">Lori/何纪辉</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(9)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(9)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:578px;width:572px;background:#52c41a" ondblclick="editItem(9)" title="门店上翻目标
+2026-06-15→2026-06-30
+负责人:Lori/何纪辉
+状态:待开始">门店上翻目标</div></div></td></tr><tr class="row-milestone"><td class="content-label">项目目标</td><td class="deliverable-label" ondblclick="editItem(10)" title="双击编辑">◆ AAM指标及衡量标准</td><td class="company-label">嘉顿/ECS</td><td class="responsible-label">Joanne/Sam</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check active" onclick="toggleMilestone(10)" title="取消里程碑">◆
+        <div class="row-actions"><button onclick="deleteTask(10)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-milestone" style="left:146px;width:464px;background:linear-gradient(135deg,#eb2f96,#722ed1)" ondblclick="editItem(10)" title="◆里程碑: AAM指标及衡量标准
+2026-06-03→2026-06-15
+负责人:Joanne/Sam
+状态:进行中">AAM指标及..</div></div></td></tr><tr class="row-prep"><td class="content-label">执行标准</td><td class="deliverable-label" ondblclick="editItem(11)" title="双击编辑">确定渠道门店分销标准</td><td class="company-label">嘉顿</td><td class="responsible-label">Lim/Carlson制定，Lori确认</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check inactive" onclick="toggleMilestone(11)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(11)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-progress" style="left:146px;width:284px;background:#faad14" ondblclick="editItem(11)" title="确定渠道门店分销标准
+2026-06-03→2026-06-10
+负责人:Lim/Carlson制定，Lori确认
+状态:进行中">确定渠道门店..</div></div></td></tr><tr class="row-prep"><td class="content-label">执行标准</td><td class="deliverable-label" ondblclick="editItem(12)" title="双击编辑">确定渠道陈列标准</td><td class="company-label">嘉顿</td><td class="responsible-label">Lim/Carlson</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check inactive" onclick="toggleMilestone(12)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(12)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-progress" style="left:146px;width:284px;background:#faad14" ondblclick="editItem(12)" title="确定渠道陈列标准
+2026-06-03→2026-06-10
+负责人:Lim/Carlson
+状态:进行中">确定渠道陈列..</div></div></td></tr><tr class="row-prep"><td class="content-label">执行标准</td><td class="deliverable-label" ondblclick="editItem(13)" title="双击编辑">确定渠道销售套餐</td><td class="company-label">嘉顿</td><td class="responsible-label">Lim/Carlson</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check inactive" onclick="toggleMilestone(13)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(13)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-progress" style="left:146px;width:284px;background:#faad14" ondblclick="editItem(13)" title="确定渠道销售套餐
+2026-06-03→2026-06-10
+负责人:Lim/Carlson
+状态:进行中">确定渠道销售..</div></div></td></tr><tr class="row-prep"><td class="content-label">项目奖励机制</td><td class="deliverable-label" ondblclick="editItem(14)" title="双击编辑">销售团队奖励机制</td><td class="company-label">嘉顿</td><td class="responsible-label">Lim/Carlson</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check inactive" onclick="toggleMilestone(14)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(14)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-progress" style="left:146px;width:284px;background:#faad14" ondblclick="editItem(14)" title="销售团队奖励机制
+2026-06-03→2026-06-10
+负责人:Lim/Carlson
+状态:进行中">销售团队奖励..</div></div></td></tr><tr class="row-prep"><td class="content-label">项目奖励机制</td><td class="deliverable-label" ondblclick="editItem(15)" title="双击编辑">客户奖励机制</td><td class="company-label">嘉顿</td><td class="responsible-label">Lim/Carlson</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check inactive" onclick="toggleMilestone(15)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(15)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-progress" style="left:146px;width:284px;background:#faad14" ondblclick="editItem(15)" title="客户奖励机制
+2026-06-03→2026-06-10
+负责人:Lim/Carlson
+状态:进行中">客户奖励机制</div></div></td></tr><tr class="row-prep"><td class="content-label">项目流程</td><td class="deliverable-label" ondblclick="editItem(16)" title="双击编辑">确定供应链流程</td><td class="company-label">嘉顿/ECS</td><td class="responsible-label">Lim/Lila</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(16)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(16)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:146px;width:284px;background:#52c41a" ondblclick="editItem(16)" title="确定供应链流程
+2026-06-03→2026-06-10
+负责人:Lim/Lila
+状态:待开始">确定供应链流..</div></div></td></tr><tr class="row-prep"><td class="content-label">项目流程</td><td class="deliverable-label" ondblclick="editItem(17)" title="双击编辑">确定财务流程</td><td class="company-label">嘉顿/ECS</td><td class="responsible-label">Lim/Lila</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(17)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(17)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:146px;width:284px;background:#52c41a" ondblclick="editItem(17)" title="确定财务流程
+2026-06-03→2026-06-10
+负责人:Lim/Lila
+状态:待开始">确定财务流程</div></div></td></tr><tr class="row-prep"><td class="content-label">项目预算</td><td class="deliverable-label" ondblclick="editItem(18)" title="双击编辑">项目预估</td><td class="company-label">嘉顿</td><td class="responsible-label">Lori/Lim</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(18)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(18)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:434px;width:536px;background:#52c41a" ondblclick="editItem(18)" title="项目预估
+2026-06-11→2026-06-25
+负责人:Lori/Lim
+状态:待开始">项目预估</div></div></td></tr><tr class="row-prep"><td class="content-label">项目预算</td><td class="deliverable-label" ondblclick="editItem(19)" title="双击编辑">制定项目预算</td><td class="company-label">嘉顿</td><td class="responsible-label">Lori/Lim</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(19)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(19)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:434px;width:536px;background:#52c41a" ondblclick="editItem(19)" title="制定项目预算
+2026-06-11→2026-06-25
+负责人:Lori/Lim
+状态:待开始">制定项目预算</div></div></td></tr><tr class="row-prep"><td class="content-label">项目预算</td><td class="deliverable-label" ondblclick="editItem(20)" title="双击编辑">确定项目预算</td><td class="company-label">嘉顿</td><td class="responsible-label">Lori/Lim</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(20)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(20)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:434px;width:536px;background:#52c41a" ondblclick="editItem(20)" title="确定项目预算
+2026-06-11→2026-06-25
+负责人:Lori/Lim
+状态:待开始">确定项目预算</div></div></td></tr><tr class="row-prep"><td class="content-label">项目流程</td><td class="deliverable-label" ondblclick="editItem(21)" title="双击编辑">确认服务形式及费用</td><td class="company-label">嘉顿/ECS</td><td class="responsible-label">Lori/Sam</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(21)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(21)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:398px;width:212px;background:#52c41a" ondblclick="editItem(21)" title="确认服务形式及费用
+2026-06-10→2026-06-15
+负责人:Lori/Sam
+状态:待开始">确认服务形式..</div></div></td></tr><tr class="row-milestone"><td class="content-label">项目流程</td><td class="deliverable-label" ondblclick="editItem(22)" title="双击编辑">◆ 完成合同签署</td><td class="company-label">嘉顿/ECS</td><td class="responsible-label">Lori/Sam</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check active" onclick="toggleMilestone(22)" title="取消里程碑">◆
+        <div class="row-actions"><button onclick="deleteTask(22)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-milestone" style="left:578px;width:572px;background:linear-gradient(135deg,#eb2f96,#722ed1)" ondblclick="editItem(22)" title="◆里程碑: 完成合同签署
+2026-06-15→2026-06-30
+负责人:Lori/Sam
+状态:待开始">完成合同签署</div></div></td></tr><tr class="row-prep"><td class="content-label">团队沟通</td><td class="deliverable-label" ondblclick="editItem(23)" title="双击编辑">一线团队培训</td><td class="company-label">ECS</td><td class="responsible-label">Lila</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(23)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(23)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:1226px;width:32px;background:#52c41a" ondblclick="editItem(23)" title="一线团队培训
+2026-07-03→2026-07-03
+负责人:Lila
+状态:待开始"></div></div></td></tr><tr class="row-prep"><td class="content-label">可持续机制</td><td class="deliverable-label" ondblclick="editItem(24)" title="双击编辑">商城活动</td><td class="company-label">ECS</td><td class="responsible-label">Lila</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(24)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(24)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:614px;width:392px;background:#52c41a" ondblclick="editItem(24)" title="商城活动
+2026-06-16→2026-06-26
+负责人:Lila
+状态:待开始">商城活动</div></div></td></tr><tr class="row-prep"><td class="content-label">可持续机制</td><td class="deliverable-label" ondblclick="editItem(25)" title="双击编辑">商城内容</td><td class="company-label">ECS</td><td class="responsible-label">Lila</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(25)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(25)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:614px;width:536px;background:#52c41a" ondblclick="editItem(25)" title="商城内容
+2026-06-16→2026-06-30
+负责人:Lila
+状态:待开始">商城内容</div></div></td></tr><tr class="row-prep"><td class="content-label">技术解决方案</td><td class="deliverable-label" ondblclick="editItem(26)" title="双击编辑">系统配置</td><td class="company-label">ECS</td><td class="responsible-label">Lila</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check inactive" onclick="toggleMilestone(26)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(26)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-progress" style="left:1154px;width:212px;background:#faad14" ondblclick="editItem(26)" title="系统配置
+2026-07-01→2026-07-06
+负责人:Lila
+状态:进行中">系统配置</div></div></td></tr><tr class="row-prep"><td class="content-label">技术解决方案</td><td class="deliverable-label" ondblclick="editItem(27)" title="双击编辑">商城配置</td><td class="company-label">ECS</td><td class="responsible-label">Lila</td><td class="company-label col-status-data"><span class="status-badge status-progress">进行中</span></td><td class="ms-check inactive" onclick="toggleMilestone(27)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(27)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-progress" style="left:1154px;width:212px;background:#faad14" ondblclick="editItem(27)" title="商城配置
+2026-07-01→2026-07-06
+负责人:Lila
+状态:进行中">商城配置</div></div></td></tr><tr class="row-milestone"><td class="phase-label phase-launch" rowspan="1">项目实施</td><td class="content-label">项目上线</td><td class="deliverable-label" ondblclick="editItem(28)" title="双击编辑">◆ 项目正式启动</td><td class="company-label">嘉顿/ECS</td><td class="responsible-label">Lori/Lilia</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check active" onclick="toggleMilestone(28)" title="取消里程碑">◆
+        <div class="row-actions"><button onclick="deleteTask(28)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-milestone" style="left:1478px;width:32px;background:linear-gradient(135deg,#eb2f96,#722ed1)" ondblclick="editItem(28)" title="◆里程碑: 项目正式启动
+2026-07-10→2026-07-10
+负责人:Lori/Lilia
+状态:待开始"></div></div></td></tr><tr class="row-exec"><td class="phase-label phase-exec" rowspan="4">实施阶段</td><td class="content-label">拓店管理</td><td class="deliverable-label" ondblclick="editItem(29)" title="双击编辑">销售拓、店内执行及活跃率管理</td><td class="company-label">ECS</td><td class="responsible-label">Lila</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(29)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(29)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar" style="left:1478px;width:1400px;background:#1890ff;opacity:.5;border:1px dashed #1890ff" ondblclick="editItem(29)" title="销售拓、店内执行及活跃率管理
+（持续中）">销售拓、..</div></div></td></tr><tr class="row-exec"><td class="content-label">拓店管理</td><td class="deliverable-label" ondblclick="editItem(30)" title="双击编辑">订货商城运营</td><td class="company-label">ECS</td><td class="responsible-label">Lila</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(30)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(30)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar" style="left:1478px;width:1400px;background:#1890ff;opacity:.5;border:1px dashed #1890ff" ondblclick="editItem(30)" title="订货商城运营
+（持续中）">订货商城..</div></div></td></tr><tr class="row-exec"><td class="content-label">建立项目追踪体系</td><td class="deliverable-label" ondblclick="editItem(31)" title="双击编辑">每日项目进度追踪报告</td><td class="company-label">ECS</td><td class="responsible-label">Lila</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(31)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(31)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar" style="left:1478px;width:1400px;background:#1890ff;opacity:.5;border:1px dashed #1890ff" ondblclick="editItem(31)" title="每日项目进度追踪报告
+（持续中）">每日项目..</div></div></td></tr><tr class="row-exec"><td class="content-label">建立项目追踪体系</td><td class="deliverable-label" ondblclick="editItem(32)" title="双击编辑">每周项目进度回顾及调优</td><td class="company-label">ECS</td><td class="responsible-label">Lila</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(32)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(32)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar" style="left:1478px;width:1400px;background:#1890ff;opacity:.5;border:1px dashed #1890ff" ondblclick="editItem(32)" title="每周项目进度回顾及调优
+（持续中）">每周项目..</div></div></td></tr><tr class="row-milestone"><td class="phase-label phase-review" rowspan="4">回顾阶段</td><td class="content-label">项目回顾及调优</td><td class="deliverable-label" ondblclick="editItem(33)" title="双击编辑">◆ 项目周期性评估（每月）</td><td class="company-label">ECS</td><td class="responsible-label">Lila</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check active" onclick="toggleMilestone(33)" title="取消里程碑">◆
+        <div class="row-actions"><button onclick="deleteTask(33)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-milestone" style="left:2270px;width:356px;background:linear-gradient(135deg,#eb2f96,#722ed1)" ondblclick="editItem(33)" title="◆里程碑: 项目周期性评估（每月）
+2026-08-01→2026-08-10
+负责人:Lila
+状态:待开始">项目周期性评..</div></div></td></tr><tr class="row-review"><td class="content-label">项目回顾及调优</td><td class="deliverable-label" ondblclick="editItem(34)" title="双击编辑">AAM指标评估</td><td class="company-label">ECS</td><td class="responsible-label">Sam</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(34)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(34)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:2270px;width:356px;background:#722ed1" ondblclick="editItem(34)" title="AAM指标评估
+2026-08-01→2026-08-10
+负责人:Sam
+状态:待开始">AAM指标评..</div></div></td></tr><tr class="row-review"><td class="content-label">项目回顾及调优</td><td class="deliverable-label" ondblclick="editItem(35)" title="双击编辑">项目调优建议</td><td class="company-label">ECS</td><td class="responsible-label">Sam</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(35)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(35)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:2270px;width:356px;background:#722ed1" ondblclick="editItem(35)" title="项目调优建议
+2026-08-01→2026-08-10
+负责人:Sam
+状态:待开始">项目调优建议</div></div></td></tr><tr class="row-review"><td class="content-label">项目回顾及调优</td><td class="deliverable-label" ondblclick="editItem(36)" title="双击编辑">制定调优行动方案</td><td class="company-label">ECS</td><td class="responsible-label">Sam</td><td class="company-label col-status-data"><span class="status-badge status-pending">待开始</span></td><td class="ms-check inactive" onclick="toggleMilestone(36)" title="标记为里程碑">◇
+        <div class="row-actions"><button onclick="deleteTask(36)" title="删除此行">🗑️</button></div></td><td colspan="80" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px"><div class="today-line" style="left:306px"><span class="today-label">今天</span></div><div class="bar bar-pending" style="left:2270px;width:356px;background:#722ed1" ondblclick="editItem(36)" title="制定调优行动方案
+2026-08-01→2026-08-10
+负责人:Sam
+状态:待开始">制定调优行动..</div></div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>✏️ 编辑任务</h3>
+    <label>产出 (Deliverable)</label><input id="editDeliverable">
+    <div class="form-row">
+      <div><label>内容 (Category)</label><input id="editContent"></div>
+      <div><label>公司</label><input id="editCompany"></div>
+    </div>
+    <label>负责人</label><input id="editResponsible">
+    <div class="form-row">
+      <div><label>开始日期</label><input id="editStart" type="date"></div>
+      <div><label>结束日期</label><input id="editEnd" type="date"></div>
+    </div>
+    <label>状态</label>
+    <select id="editStatus">
+      <option value="完成">✅ 完成</option>
+      <option value="进行中">🔄 进行中</option>
+      <option value="">⏳ 待开始</option>
+    </select>
+    <div class="checkbox-row">
+      <input type="checkbox" id="editMilestone">
+      <label for="editMilestone">◆ 标记为里程碑 (Milestone)</label>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-ok" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast toast-info" id="toast">📋 显示全部</div>
+
+<script>
+// ====================================================================
+// COLUMN CONFIG  —— drag header borders to resize
+// ====================================================================
+const COL_DEFS = [
+  { id:'phase',        label:'阶段',       width:70,  minW:50  },
+  { id:'content',      label:'内容',       width:100, minW:60  },
+  { id:'deliverable',  label:'产出',       width:170, minW:80  },
+  { id:'company',      label:'公司',       width:55,  minW:40  },
+  { id:'responsible',  label:'负责',       width:85,  minW:50  },
+  { id:'status',       label:'状态',       width:55,  minW:40  },
+  { id:'milestone',    label:'◆',          width:40,  minW:30  },
+];
+
+function loadColWidths() {
+  try {
+    const s = localStorage.getItem('ogd_col_widths');
+    if (s) { const w = JSON.parse(s); COL_DEFS.forEach(c => { if (w[c.id]) c.width = w[c.id]; }); }
+  } catch(e) {}
+}
+function saveColWidths() {
+  const o = {}; COL_DEFS.forEach(c => o[c.id]=c.width);
+  try { localStorage.setItem('ogd_col_widths', JSON.stringify(o)); } catch(e) {}
+}
+
+// ====================================================================
+// DATA
+// ====================================================================
+const INITIAL_DATA = [{"phase":"准备阶段","content":"业务机会分析","deliverable":"确定目标城市","company":"嘉顿","responsible":"Lori","start":"2026-06-02","end":"2026-06-02","status":"完成","milestone":true},{"phase":"准备阶段","content":"业务机会分析","deliverable":"渠道及门店清单","company":"ECS","responsible":"Lilia","start":"2026-06-03","end":"2026-06-15","status":"进行中"},{"phase":"准备阶段","content":"业务机会分析","deliverable":"确定目标门店清单","company":"嘉顿","responsible":"Lori/何纪辉","start":"2026-06-15","end":"2026-06-30","status":""},{"phase":"准备阶段","content":"项目策略","deliverable":"渠道及产品策略","company":"嘉顿","responsible":"Lim/Carlson制定，Lori确认","start":"2026-06-03","end":"2026-06-10","status":"进行中"},{"phase":"准备阶段","content":"供应链流程","deliverable":"确定供应链具体对接方案","company":"嘉顿","responsible":"蒋大方","start":"2026-06-08","end":"2026-06-12","status":""},{"phase":"准备阶段","content":"财务对接流程","deliverable":"确定财务具体对接方案","company":"嘉顿","responsible":"张振兴","start":"2026-06-08","end":"2026-06-12","status":""},{"phase":"准备阶段","content":"项目目标","deliverable":"确定分销产品清单","company":"嘉顿","responsible":"Lim/Carlson制定，Lori确认","start":"2026-06-03","end":"2026-06-10","status":"进行中","milestone":false},{"phase":"准备阶段","content":"项目目标","deliverable":"分销目标","company":"嘉顿","responsible":"Lori/何纪辉","start":"2026-06-15","end":"2026-06-30","status":""},{"phase":"准备阶段","content":"项目目标","deliverable":"门店活跃率目标","company":"嘉顿","responsible":"Lori/何纪辉","start":"2026-06-15","end":"2026-06-30","status":""},{"phase":"准备阶段","content":"项目目标","deliverable":"门店上翻目标","company":"嘉顿","responsible":"Lori/何纪辉","start":"2026-06-15","end":"2026-06-30","status":""},{"phase":"准备阶段","content":"项目目标","deliverable":"AAM指标及衡量标准","company":"嘉顿/ECS","responsible":"Joanne/Sam","start":"2026-06-03","end":"2026-06-15","status":"进行中","milestone":true},{"phase":"准备阶段","content":"执行标准","deliverable":"确定渠道门店分销标准","company":"嘉顿","responsible":"Lim/Carlson制定，Lori确认","start":"2026-06-03","end":"2026-06-10","status":"进行中"},{"phase":"准备阶段","content":"执行标准","deliverable":"确定渠道陈列标准","company":"嘉顿","responsible":"Lim/Carlson","start":"2026-06-03","end":"2026-06-10","status":"进行中"},{"phase":"准备阶段","content":"执行标准","deliverable":"确定渠道销售套餐","company":"嘉顿","responsible":"Lim/Carlson","start":"2026-06-03","end":"2026-06-10","status":"进行中"},{"phase":"准备阶段","content":"项目奖励机制","deliverable":"销售团队奖励机制","company":"嘉顿","responsible":"Lim/Carlson","start":"2026-06-03","end":"2026-06-10","status":"进行中"},{"phase":"准备阶段","content":"项目奖励机制","deliverable":"客户奖励机制","company":"嘉顿","responsible":"Lim/Carlson","start":"2026-06-03","end":"2026-06-10","status":"进行中"},{"phase":"准备阶段","content":"项目流程","deliverable":"确定供应链流程","company":"嘉顿/ECS","responsible":"Lim/Lila","start":"2026-06-03","end":"2026-06-10","status":""},{"phase":"准备阶段","content":"项目流程","deliverable":"确定财务流程","company":"嘉顿/ECS","responsible":"Lim/Lila","start":"2026-06-03","end":"2026-06-10","status":""},{"phase":"准备阶段","content":"项目预算","deliverable":"项目预估","company":"嘉顿","responsible":"Lori/Lim","start":"2026-06-11","end":"2026-06-25","status":""},{"phase":"准备阶段","content":"项目预算","deliverable":"制定项目预算","company":"嘉顿","responsible":"Lori/Lim","start":"2026-06-11","end":"2026-06-25","status":""},{"phase":"准备阶段","content":"项目预算","deliverable":"确定项目预算","company":"嘉顿","responsible":"Lori/Lim","start":"2026-06-11","end":"2026-06-25","status":""},{"phase":"准备阶段","content":"项目流程","deliverable":"确认服务形式及费用","company":"嘉顿/ECS","responsible":"Lori/Sam","start":"2026-06-10","end":"2026-06-15","status":""},{"phase":"准备阶段","content":"项目流程","deliverable":"完成合同签署","company":"嘉顿/ECS","responsible":"Lori/Sam","start":"2026-06-15","end":"2026-06-30","status":"","milestone":true},{"phase":"准备阶段","content":"团队沟通","deliverable":"一线团队培训","company":"ECS","responsible":"Lila","start":"2026-07-03","end":"2026-07-03","status":""},{"phase":"准备阶段","content":"可持续机制","deliverable":"商城活动","company":"ECS","responsible":"Lila","start":"2026-06-16","end":"2026-06-26","status":""},{"phase":"准备阶段","content":"可持续机制","deliverable":"商城内容","company":"ECS","responsible":"Lila","start":"2026-06-16","end":"2026-06-30","status":""},{"phase":"准备阶段","content":"技术解决方案","deliverable":"系统配置","company":"ECS","responsible":"Lila","start":"2026-07-01","end":"2026-07-06","status":"进行中"},{"phase":"准备阶段","content":"技术解决方案","deliverable":"商城配置","company":"ECS","responsible":"Lila","start":"2026-07-01","end":"2026-07-06","status":"进行中"},{"phase":"项目实施","content":"项目上线","deliverable":"项目正式启动","company":"嘉顿/ECS","responsible":"Lori/Lilia","start":"2026-07-10","end":"2026-07-10","status":"","milestone":true},{"phase":"实施阶段","content":"拓店管理","deliverable":"销售拓、店内执行及活跃率管理","company":"ECS","responsible":"Lila","start":null,"end":null,"status":""},{"phase":"实施阶段","content":"拓店管理","deliverable":"订货商城运营","company":"ECS","responsible":"Lila","start":null,"end":null,"status":""},{"phase":"实施阶段","content":"建立项目追踪体系","deliverable":"每日项目进度追踪报告","company":"ECS","responsible":"Lila","start":null,"end":null,"status":""},{"phase":"实施阶段","content":"建立项目追踪体系","deliverable":"每周项目进度回顾及调优","company":"ECS","responsible":"Lila","start":null,"end":null,"status":""},{"phase":"回顾阶段","content":"项目回顾及调优","deliverable":"项目周期性评估（每月）","company":"ECS","responsible":"Lila","start":"2026-08-01","end":"2026-08-10","status":"","milestone":true},{"phase":"回顾阶段","content":"项目回顾及调优","deliverable":"AAM指标评估","company":"ECS","responsible":"Sam","start":"2026-08-01","end":"2026-08-10","status":""},{"phase":"回顾阶段","content":"项目回顾及调优","deliverable":"项目调优建议","company":"ECS","responsible":"Sam","start":"2026-08-01","end":"2026-08-10","status":""},{"phase":"回顾阶段","content":"项目回顾及调优","deliverable":"制定调优行动方案","company":"ECS","responsible":"Sam","start":"2026-08-01","end":"2026-08-10","status":""}];
+
+// ====================================================================
+// STATE
+// ====================================================================
+let projectData = [];
+let currentEditIdx = -1;
+let milestonesOnly = false;
+const CELL_WIDTH = 36;
+let resizeCol = null; // column index being resized
+
+// ====================================================================
+// HELPERS
+// ====================================================================
+function pd(s) { if(!s) return null; const d=new Date(s); return isNaN(d.getTime())?null:d; }
+function tds(d) { return d?d.toISOString().slice(0,10):""; }
+function db(a,b) { return Math.round((b-a)/86400000); }
+function ad(d,n) { const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+
+function getPhaseClass(p) { return {准备阶段:"prep",项目实施:"launch",实施阶段:"exec",回顾阶段:"review"}[p]||"prep"; }
+function getStatusClass(s) { return s==="完成"?"done":(s==="进行中"?"progress":"pending"); }
+
+// ====================================================================
+// COLUMN STYLE UPDATER  —  recompute left offsets + widths
+// ====================================================================
+function applyColStyles() {
+  let left=0;
+  COL_DEFS.forEach(c => {
+    c._left = left;
+    left += c.width;
+  });
+  const total=COL_DEFS.reduce((s,c)=>s+c.width,0);
+
+  // Generate <style> block for column widths & sticky lefts
+  let css = '';
+  COL_DEFS.forEach((c,i) => {
+    const w = c.width;
+    const l = c._left;
+    // Width
+    css += `.col-${c.id}{width:${w}px;min-width:${w}px;max-width:${w}px;}`;
+    // Header sticky left
+    css += `thead .col-${c.id}{left:${l}px;}`;
+    // Body sticky left for data cells
+    const dataSel = {
+      phase:'td.phase-label', content:'td.content-label', deliverable:'td.deliverable-label',
+      company:'td.company-label', responsible:'td.responsible-label', status:'td.col-status-data',
+      milestone:'td.ms-check'
+    }[c.id];
+    if (dataSel) css += `${dataSel}{left:${l}px;}`;
+  });
+  // Separator after last frozen column
+  css += `td:nth-child(7){border-right:2px solid #91d5ff}`;
+
+  let el = document.getElementById('colStyles');
+  if (!el) { el=document.createElement('style'); el.id='colStyles'; document.head.appendChild(el); }
+  el.textContent = css;
+}
+
+// ====================================================================
+// TIMELINE
+// ====================================================================
+function computeTL(data) {
+  let mn=null,mx=null;
+  data.forEach(d=>{const s=pd(d.start),e=pd(d.end);if(s&&(!mn||s<mn))mn=s;if(e&&(!mx||e>mx))mx=e;if(s&&e&&e>mx)mx=e;});
+  if(!mn)mn=new Date("2026-06-01"); if(!mx)mx=new Date("2026-08-15");
+  mn=ad(mn,-3); mx=ad(mx,7);
+  return {minDate:mn,maxDate:mx,totalDays:db(mn,mx)};
+}
+
+// ====================================================================
+// RENDER
+// ====================================================================
+function renderGantt() {
+  applyColStyles();
+  const disp = milestonesOnly ? projectData.filter(d=>d.milestone) : projectData;
+  const {minDate,maxDate,totalDays} = computeTL(projectData);
+  const head = document.getElementById("ganttHead");
+  const body = document.getElementById("ganttBody");
+
+  // ── Month headers ──
+  let cur = new Date(minDate);
+  let mgs=[], cm=null;
+  for(let i=0;i<=totalDays;i++){const m=cur.getMonth();if(m!==cm){cm=m;mgs.push({month:m,year:cur.getFullYear(),startIdx:i,label:cur.getFullYear()+"/"+String(m+1).padStart(2,'0')});}cur=ad(cur,1);}
+
+  const fc = COL_DEFS.map(c=>`<th class="col-${c.id}">${c.label}<div class="resize-handle" data-col="${c.id}" title="拖拽调整宽度"></div></th>`).join('');
+  let h = `<tr class="gantt-header">${fc}<th colspan="${totalDays+1}" style="padding:0;border-left:2px solid #91d5ff"><div style="display:flex">`;
+  mgs.forEach((mg,idx)=>{const sp=(idx<mgs.length-1?mgs[idx+1].startIdx:totalDays+1)-mg.startIdx;h+=`<div style="flex:${sp};text-align:center;padding:4px 0;font-weight:700;color:#1890ff;font-size:12px;border-right:1px solid #e6f0ff">${mg.label}</div>`;});
+  h += '</div></th></tr>';
+
+  // ── Day headers ──
+  h += '<tr class="gantt-header"><th colspan="7" style="border-right:2px solid #91d5ff"></th>';
+  cur = new Date(minDate);
+  for(let i=0;i<=totalDays;i++){
+    const day=cur.getDay(), we=day===0||day===6;
+    const it=tds(cur)===tds(new Date());
+    h += `<th style="${we?'color:#bbb':''}${it?'background:#fff1f0;color:#ff4d4f;font-weight:700':''}width:${CELL_WIDTH}px;min-width:${CELL_WIDTH}px;padding:3px 0;font-size:10px">${cur.getDate()}</th>`;
+    cur=ad(cur,1);
+  }
+  h += '</tr>';
+  head.innerHTML = h;
+
+  // ── Body ──
+  const phaseOrder=["准备阶段","项目实施","实施阶段","回顾阶段"];
+  const phaseBarColors={"准备阶段":"#52c41a","项目实施":"#faad14","实施阶段":"#1890ff","回顾阶段":"#722ed1"};
+
+  let grps={};
+  disp.forEach(d=>{const oi=projectData.indexOf(d);if(!grps[d.phase])grps[d.phase]=[];grps[d.phase].push({data:d,oi});});
+  let pns=Object.keys(grps).sort((a,b)=>phaseOrder.indexOf(a)-phaseOrder.indexOf(b));
+
+  let bb="";
+  pns.forEach(pn=>{
+    const items=grps[pn], pc=getPhaseClass(pn);
+    items.forEach((item,i)=>{
+      const d=item.data, idx=item.oi;
+      const s=pd(d.start), e=pd(d.end);
+      const sc=getStatusClass(d.status), isMs=d.milestone;
+      const bc = isMs?'linear-gradient(135deg,#eb2f96,#722ed1)':(d.status==='完成'?'#52c41a':(d.status==='进行中'?'#faad14':phaseBarColors[d.phase]));
+      const rc = isMs?'row-milestone':'row-'+pc;
+      bb += `<tr class="${rc}">`;
+      if(i===0) bb+=`<td class="phase-label phase-${pc}" rowspan="${items.length}">${pn}</td>`;
+      bb += `<td class="content-label">${d.content}</td>`;
+      bb += `<td class="deliverable-label" ondblclick="editItem(${idx})" title="双击编辑">${isMs?'◆ ':''}${d.deliverable}</td>`;
+      bb += `<td class="company-label">${d.company}</td>`;
+      bb += `<td class="responsible-label">${d.responsible}</td>`;
+      bb += `<td class="company-label col-status-data"><span class="status-badge status-${sc}">${d.status||'待开始'}</span></td>`;
+      bb += `<td class="ms-check ${isMs?'active':'inactive'}" onclick="toggleMilestone(${idx})" title="${isMs?'取消里程碑':'标记为里程碑'}">${isMs?'◆':'◇'}
+        <div class="row-actions"><button onclick="deleteTask(${idx})" title="删除此行">🗑️</button></div></td>`;
+
+      bb += `<td colspan="${totalDays+1}" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:34px"><div class="gantt-cell" style="height:34px">`;
+
+      const today=new Date(), to=db(minDate,today);
+      if(to>=0&&to<=totalDays) bb+=`<div class="today-line" style="left:${to*CELL_WIDTH+CELL_WIDTH/2}px"><span class="today-label">今天</span></div>`;
+
+      if(s&&e){
+        const so=db(minDate,s), eo=db(minDate,e), bw=Math.max((eo-so+1)*CELL_WIDTH-4,8), bl=so*CELL_WIDTH+2;
+        const lbl=d.deliverable.length>6?d.deliverable.slice(0,6)+'..':d.deliverable;
+        bb+=`<div class="bar ${isMs?'bar-milestone':'bar-'+sc}" style="left:${bl}px;width:${bw}px;background:${bc}" ondblclick="editItem(${idx})" title="${isMs?'◆里程碑: ':''}${d.deliverable}\n${d.start||'?'}→${d.end||'?'}\n负责人:${d.responsible}\n状态:${d.status||'待开始'}">${bw>60?lbl:''}</div>`;
+      } else if(!s&&!e&&(d.phase==="实施阶段"||d.phase==="回顾阶段")){
+        const ro=db(minDate,new Date("2026-07-10")), re=db(minDate,maxDate), bw=Math.max((re-ro+1)*CELL_WIDTH-4,8), bl=ro*CELL_WIDTH+2;
+        bb+=`<div class="bar" style="left:${bl}px;width:${bw}px;background:${bc};opacity:.5;border:1px dashed ${bc}" ondblclick="editItem(${idx})" title="${d.deliverable}\n（持续中）">${bw>80?d.deliverable.slice(0,4)+'..':''}</div>`;
+      } else if(!s&&e){
+        const eo=db(minDate,e);
+        bb+=`<div class="bar" style="left:${eo*CELL_WIDTH+12}px;width:12px;background:#bbb" ondblclick="editItem(${idx})" title="${d.deliverable}\n截止:${d.end}"></div>`;
+      }
+      bb+='</div></td></tr>';
+    });
+  });
+  body.innerHTML = bb;
+  renderMilestones();
+  updatePersistInfo();
+  initResize();
+}
+
+// ====================================================================
+// MILESTONE
+// ====================================================================
+function renderMilestones() {
+  const ms=projectData.filter(d=>d.milestone);
+  document.getElementById("msCount").textContent=ms.length;
+  ms.sort((a,b)=>(pd(a.end)||pd(a.start)||new Date(0))-(pd(b.end)||pd(b.start)||new Date(0)));
+  let html="";
+  ms.forEach((d,i)=>{
+    const done=d.status==="完成", s=pd(d.end||d.start);
+    const ds=s?`${s.getMonth()+1}/${s.getDate()}`:"";
+    html+=`<div class="ms-item" onclick="scrollToRow('${d.deliverable.replace(/'/g,"\\'")}')" title="点击滚动">
+      <div class="ms-diamond" style="color:${done?'#52c41a':'#eb2f96'}">${done?'✅':'◆'}</div>
+      <div class="ms-date">${ds}</div>
+      <div class="ms-label">${d.deliverable.length>7?d.deliverable.slice(0,7)+'…':d.deliverable}</div>
+      <div class="ms-phase">${d.phase}</div>${i<ms.length-1?'<div class="ms-line"></div>':''}</div>`;
+  });
+  document.getElementById("msTimeline").innerHTML=html||'<span style="color:#999;font-size:13px">暂无里程碑</span>';
+}
+
+function scrollToRow(del) {
+  document.querySelectorAll(".deliverable-label").forEach(c=>{
+    if(c.textContent.trim().replace(/◆\s*/,'')===del){
+      c.closest("tr").scrollIntoView({behavior:"smooth",block:"center"});
+      c.style.background="#fff0f6"; setTimeout(()=>c.style.background="",2000);
+    }
+  });
+}
+
+function toggleMilestone(idx){projectData[idx].milestone=!projectData[idx].milestone;saveToLocal();renderGantt();showToast(projectData[idx].milestone?"◆ 已标记里程碑":"◇ 已取消","info");}
+function toggleMilestones(){milestonesOnly=!milestonesOnly;const b=document.getElementById("msFilterBtn");b.textContent=milestonesOnly?"◆ 显示全部":"◆ 只看里程碑";b.style.background=milestonesOnly?"#eb2f96":"";b.style.color=milestonesOnly?"#fff":"";renderGantt();showToast(milestonesOnly?"◆ 只看里程碑":"📋 显示全部","info");}
+
+// ====================================================================
+// ADD / DELETE
+// ====================================================================
+function addTask() {
+  projectData.push({phase:"准备阶段",content:"新任务",deliverable:"新交付物",company:"",responsible:"",start:null,end:null,status:"",milestone:false});
+  saveToLocal(); renderGantt();
+  // Scroll to bottom
+  setTimeout(()=>{const w=document.getElementById("ganttWrapper");w.scrollTop=w.scrollHeight;},100);
+  showToast("➕ 已添加新任务，双击编辑","success");
+}
+
+function deleteTask(idx) {
+  if(!confirm(`确定删除「${projectData[idx].deliverable}」？`)) return;
+  projectData.splice(idx,1);
+  saveToLocal(); renderGantt();
+  showToast("🗑️ 已删除","info");
+}
+
+// ====================================================================
+// EDIT MODAL
+// ====================================================================
+function editItem(idx){
+  currentEditIdx=idx; const d=projectData[idx];
+  document.getElementById("editDeliverable").value=d.deliverable;
+  document.getElementById("editContent").value=d.content;
+  document.getElementById("editCompany").value=d.company;
+  document.getElementById("editResponsible").value=d.responsible;
+  document.getElementById("editStart").value=d.start||"";
+  document.getElementById("editEnd").value=d.end||"";
+  document.getElementById("editStatus").value=d.status||"";
+  document.getElementById("editMilestone").checked=!!d.milestone;
+  document.getElementById("editModal").classList.add("active");
+  document.getElementById("editDeliverable").focus();
+}
+function closeModal(){document.getElementById("editModal").classList.remove("active");currentEditIdx=-1;}
+function saveEdit(){
+  if(currentEditIdx<0)return; const d=projectData[currentEditIdx];
+  d.deliverable=document.getElementById("editDeliverable").value||d.deliverable;
+  d.content=document.getElementById("editContent").value||d.content;
+  d.company=document.getElementById("editCompany").value||d.company;
+  d.responsible=document.getElementById("editResponsible").value||d.responsible;
+  d.start=document.getElementById("editStart").value||null;
+  d.end=document.getElementById("editEnd").value||null;
+  d.status=document.getElementById("editStatus").value;
+  d.milestone=document.getElementById("editMilestone").checked;
+  closeModal();saveToLocal();renderGantt();showToast("✅ 已更新并保存","success");
+}
+
+// ====================================================================
+// COLUMN RESIZE
+// ====================================================================
+function initResize() {
+  document.querySelectorAll('.resize-handle').forEach(h => {
+    h.onmousedown = function(e) {
+      e.preventDefault();
+      const colId = this.dataset.col;
+      const colIdx = COL_DEFS.findIndex(c=>c.id===colId);
+      if(colIdx<0) return;
+      const col = COL_DEFS[colIdx];
+      const startX = e.clientX;
+      const startW = col.width;
+      this.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      function onMove(ev) {
+        const dx = ev.clientX - startX;
+        const newW = Math.max(col.minW, startW + dx);
+        col.width = newW;
+        renderGantt();
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        h.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        saveColWidths();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    };
+  });
+}
+
+// ====================================================================
+// PERSISTENCE
+// ====================================================================
+function saveToLocal(){try{localStorage.setItem('ogd_gantt_data',JSON.stringify(projectData));updatePersistInfo();}catch(e){}}
+function loadData(data){projectData=JSON.parse(JSON.stringify(data));renderGantt();}
+function resetData(){localStorage.removeItem('ogd_gantt_data');loadData(INITIAL_DATA);showToast("↺ 已重置","info");}
+function updatePersistInfo(){
+  const s=localStorage.getItem('ogd_gantt_data');
+  const ms=projectData.filter(d=>d.milestone).length;
+  const dn=projectData.filter(d=>d.status==="完成").length;
+  document.getElementById("persistInfo").innerHTML=`<span class="badge ${s?'badge-green':'badge-orange'}">${s?'💾 已保存':'⚠️ 未保存'}</span><span>${projectData.length}项 · ${dn}完成 · <span style="color:#eb2f96;font-weight:600">◆ ${ms}里程碑</span></span><span style="color:#bbb">|</span><span>分享请点<strong>"📤导出HTML"</strong></span>`;
+}
+
+// ====================================================================
+// EXPORT / IMPORT
+// ====================================================================
+function exportHtml(){
+  const dj=JSON.stringify(projectData);
+  fetch(document.location.href).then(r=>r.text()).then(html=>{
+    downloadBlob(html.replace(/const INITIAL_DATA = \[[\s\S]*?\];/,"const INITIAL_DATA = "+dj+";"),'OGD项目甘特图_分享版.html','text/html');
+    showToast("📤 HTML已下载","success");
+  }).catch(()=>{
+    downloadBlob(document.documentElement.outerHTML.replace(/const INITIAL_DATA = \[[\s\S]*?\];/,"const INITIAL_DATA = "+dj+";"),'OGD项目甘特图_分享版.html','text/html');
+    showToast("📤 HTML已下载","success");
+  });
+}
+function exportJson(){
+  downloadBlob(JSON.stringify({version:"1.0",exportTime:new Date().toISOString(),projectName:"OGD分销拓展项目",tasks:projectData},null,2),`OGD甘特图_${new Date().toISOString().slice(0,10)}.json`,'application/json');
+  showToast("📋 JSON已导出","success");
+}
+function importJson(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=function(e){
+    try{
+      const p=JSON.parse(e.target.result);
+      const t=Array.isArray(p)?p:(p.tasks||[]);
+      if(!t.length)throw new Error("无数据");
+      t.forEach((x,i)=>{if(!x.phase||!x.deliverable)throw new Error(`第${i+1}项缺字段`);});
+      loadData(t);saveToLocal();showToast(`📂 已导入 ${t.length} 项`,"success");
+    } catch(err){showToast("❌ 导入失败: "+err.message,"error");}
+  };
+  r.readAsText(f);ev.target.value='';
+}
+function downloadBlob(content,fn,m){const b=new Blob([content],{type:m+';charset=utf-8'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(u),1000);}
+function showToast(msg,tp){const t=document.getElementById("toast");t.textContent=msg;t.className="toast toast-"+(tp||"info")+" show";clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove("show"),3000);}
+
+// ====================================================================
+// INIT
+// ====================================================================
+loadColWidths();
+(function init(){
+  try{const s=localStorage.getItem('ogd_gantt_data');projectData=s?JSON.parse(s):JSON.parse(JSON.stringify(INITIAL_DATA));}catch(e){projectData=JSON.parse(JSON.stringify(INITIAL_DATA));}
+  renderGantt();
+})();
+
+document.addEventListener("keydown",function(e){
+  if(e.key==="Escape")closeModal();
+  if(e.key==="Enter"&&document.getElementById("editModal").classList.contains("active"))saveEdit();
+  if((e.ctrlKey||e.metaKey)&&e.key==="s"){e.preventDefault();saveToLocal();showToast("💾 已保存","success");}
+});
+document.getElementById("editModal").addEventListener("click",function(e){if(e.target===this)closeModal();});
+</script>
+
+
+</body></html>

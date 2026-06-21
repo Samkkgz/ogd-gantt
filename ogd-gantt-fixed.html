@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OGD 分销拓展项目 - 团队协作版</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif;background:#f5f7fa;color:#333;min-height:100vh}
+.hide{display:none!important}
+
+/* Loading */
+#loadingScreen{position:fixed;inset:0;background:#f5f7fa;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999}
+.spinner{width:40px;height:40px;border:4px solid #e6f0ff;border-top-color:#1890ff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loadingScreen p{margin-top:16px;color:#666;font-size:14px}
+
+/* Login */
+.login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e6f7ff,#f0f5ff)}
+.login-card{background:#fff;border-radius:16px;padding:40px;width:380px;box-shadow:0 8px 40px rgba(0,0,0,.08);text-align:center}
+.login-card h1{font-size:22px;margin-bottom:4px;color:#003a8c}
+.login-card p{color:#888;font-size:13px;margin-bottom:24px}
+.login-card input{width:100%;padding:12px 16px;border:1px solid #d9d9d9;border-radius:8px;font-size:15px;outline:none;transition:border .2s}
+.login-card input:focus{border-color:#1890ff;box-shadow:0 0 0 3px rgba(24,144,255,.1)}
+.login-card button{width:100%;padding:12px;background:#1890ff;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;margin-top:12px;transition:background .2s}
+.login-card button:hover{background:#40a9ff}
+.login-card button:disabled{background:#bfbfbf;cursor:not-allowed}
+.login-card .login-msg{margin-top:12px;font-size:13px;min-height:20px}
+.login-card .login-msg.success{color:#52c41a}
+.login-card .login-msg.error{color:#ff4d4f}
+
+/* App Header */
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#fff;border-bottom:1px solid #e8e8e8;flex-wrap:wrap;gap:8px}
+.app-header h1{font-size:18px;display:flex;align-items:center;gap:8px}
+.app-header h1 small{font-size:12px;font-weight:400;color:#888}
+.user-info{display:flex;align-items:center;gap:12px;font-size:13px}
+.user-info .user-badge{padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-ECS{background:#e6f7ff;color:#003a8c}
+.badge-嘉顿{background:#f6ffed;color:#237804}
+.badge-admin{background:#fff7e6;color:#ad6800}
+.badge-super_admin{background:#f9f0ff;color:#722ed1}
+.user-info button{padding:6px 14px;border:1px solid #d9d9d9;border-radius:6px;background:#fff;cursor:pointer;font-size:12px}
+.user-info button:hover{background:#f5f5f5}
+
+/* Tab bar */
+.tab-bar{display:flex;background:#fff;border-bottom:1px solid #e8e8e8;padding:0 20px}
+.tab-bar button{padding:10px 20px;border:none;background:none;cursor:pointer;font-size:13px;color:#666;border-bottom:2px solid transparent;transition:all .2s}
+.tab-bar button:hover{color:#1890ff}
+.tab-bar button.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:600}
+
+/* Page content */
+.page-content{padding:16px 20px;max-width:1600px}
+
+/* Permission notice */
+.permission-notice{background:#fff7e6;border:1px solid #ffe58f;border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.permission-notice .p-badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+
+/* Toolbar */
+.toolbar{display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap}
+.toolbar button{padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;transition:all .2s;white-space:nowrap}
+.toolbar button:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.tb-primary{background:#1890ff;color:#fff}
+.tb-success{background:#52c41a;color:#fff}
+.tb-danger{background:#ff4d4f;color:#fff}
+.tb-ghost{background:#f0f0f0;color:#555}
+.tb-ghost:hover{background:#d9d9d9}
+.tb-sep{width:1px;height:24px;background:#e0e0e0;margin:0 4px;flex-shrink:0}
+.legend{display:flex;gap:10px;font-size:11px;align-items:center;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:3px}
+.lc{width:14px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* Milestone overview */
+.ms-bar{background:linear-gradient(135deg,#fff0f6,#f9f0ff);border:1px solid #ffadd2;border-radius:10px;padding:10px 14px;margin-bottom:12px}
+.ms-bar h3{font-size:13px;color:#eb2f96;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.ms-timeline{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px}
+.ms-item{display:flex;flex-direction:column;align-items:center;min-width:64px;max-width:78px;cursor:pointer;padding:3px 5px;border-radius:6px;flex-shrink:0;transition:background .2s}
+.ms-item:hover{background:rgba(235,47,150,.06)}
+.ms-diamond{font-size:14px;line-height:1}
+.ms-date{font-size:9px;color:#999;margin-top:1px}
+.ms-label{font-size:10px;color:#333;text-align:center;line-height:1.2;font-weight:500;margin-top:1px}
+.ms-phase{font-size:8px;color:#aaa}
+
+/* === GANTT TABLE === */
+.gantt-wrapper{overflow:auto;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.08);max-height:70vh;background:#fff}
+.gantt-wrapper table{border-collapse:separate;border-spacing:0;font-size:13px;min-width:1000px}
+.gantt-wrapper th,.gantt-wrapper td{border:1px solid #e8e8e8;padding:0;vertical-align:middle}
+.gantt-wrapper th{background:#fafafa;font-weight:600;font-size:12px;color:#555;text-align:center}
+
+/* === HEADER FREEZE (vertical) — thead cells are sticky-top === */
+.date-header th{background:#e6f0ff;padding:4px 2px;font-size:11px;color:#333;border-bottom:2px solid #91d5ff}
+.gantt-wrapper thead th{position:sticky;top:0;z-index:25}
+.date-header+tr th{top:30px}
+
+/* === FROZEN LEFT COLUMNS — sticky positioning (dynamic + static fallback) === */
+td.fixed-phase{position:sticky;left:0px;z-index:10}
+td.fixed-content{position:sticky;left:70px;z-index:10}
+td.fixed-deliverable{position:sticky;left:170px;z-index:10}
+td.fixed-company{position:sticky;left:340px;z-index:10}
+td.fixed-responsible{position:sticky;left:395px;z-index:10}
+td.fixed-status{position:sticky;left:480px;z-index:10}
+td.fixed-milestone{position:sticky;left:535px;z-index:10}
+
+/* Separator after last frozen column */
+.gantt-wrapper td.sep-col{border-right:2px solid #91d5ff}
+.gantt-wrapper th.sep-col{border-right:2px solid #91d5ff}
+
+/* === ROW COLORS — phase-based row tinting === */
+tr.phase-prep td{background:#f6ffed}
+tr.phase-launch td{background:#fff7e6}
+tr.phase-exec td{background:#e6f7ff}
+tr.phase-review td{background:#f9f0ff}
+tr.phase-milestone td{background:#fff0f6}
+
+/* === FROZEN CELL BACKGROUNDS — explicit for position:sticky to render === */
+.phase-label{font-weight:700;writing-mode:vertical-lr;letter-spacing:4px;font-size:13px;text-align:center;padding:8px 4px;min-height:60px}
+tr.phase-prep td.phase-label{background:#d9f7be;color:#237804}
+tr.phase-launch td.phase-label{background:#ffe58f;color:#ad6800}
+tr.phase-exec td.phase-label{background:#91d5ff;color:#003a8c}
+tr.phase-review td.phase-label{background:#d3adf7;color:#391063}
+tr.phase-milestone td.phase-label{background:#ffadd2;color:#eb2f96}
+
+/* Generic frozen cell explicit backgrounds */
+tr.phase-prep td.cell,tr.phase-prep td.del-cell,tr.phase-prep td.ms-cell,tr.phase-prep td.col-status-data{background:#f6ffed}
+tr.phase-launch td.cell,tr.phase-launch td.del-cell,tr.phase-launch td.ms-cell,tr.phase-launch td.col-status-data{background:#fff7e6}
+tr.phase-exec td.cell,tr.phase-exec td.del-cell,tr.phase-exec td.ms-cell,tr.phase-exec td.col-status-data{background:#e6f7ff}
+tr.phase-review td.cell,tr.phase-review td.del-cell,tr.phase-review td.ms-cell,tr.phase-review td.col-status-data{background:#f9f0ff}
+tr.phase-milestone td.cell,tr.phase-milestone td.del-cell,tr.phase-milestone td.ms-cell,tr.phase-milestone td.col-status-data{background:#fff0f6}
+
+/* Row hover effect on frozen cells */
+tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cell,tr:hover td.col-status-data{filter:brightness(0.97)}
+
+/* === CELL TYPES (frozen columns) === */
+.cell{padding:5px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.del-cell{cursor:default;padding:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative}
+.del-cell:hover{background:#f0f0f0!important}
+.ms-cell{text-align:center;padding:4px;cursor:pointer;font-size:15px;line-height:1}
+.col-status-data{text-align:center;padding:5px}
+
+/* Status badges */
+.status-badge{padding:1px 7px;border-radius:10px;font-size:11px;white-space:nowrap;display:inline-block}
+.status-done{background:#d9f7be;color:#237804}
+.status-progress{background:#fff7b3;color:#ad6800}
+.status-pending{background:#f0f0f0;color:#999}
+
+/* Column resize handles */
+.resize-handle{position:absolute;right:0;top:0;bottom:0;width:4px;cursor:col-resize;z-index:50;transition:background .15s}
+.resize-handle:hover,.resize-handle.active{background:#1890ff}
+
+/* === TASK BARS (gantt chart area) === */
+.gantt-cell{position:relative;height:32px;min-width:100%}
+.task-bar{position:absolute;height:20px;border-radius:4px;top:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.1);transition:all .15s}
+.task-bar:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.bar-milestone{background:linear-gradient(135deg,#eb2f96,#722ed1)!important;box-shadow:0 1px 4px rgba(235,47,150,.3);border:1px solid rgba(235,47,150,.3)}
+.bar-milestone::before{content:"◆ ";font-size:9px}
+
+/* Today line */
+.today-line{position:absolute;top:0;bottom:0;width:2px;background:#ff4d4f;z-index:5;pointer-events:none}
+.today-label{position:absolute;top:-24px;left:50%;transform:translateX(-50%);font-size:9px;color:#ff4d4f;white-space:nowrap}
+
+/* Row actions (delete button) — embedded inside del-cell */
+.row-actions{position:absolute;right:2px;top:2px;opacity:0;transition:opacity .2s;z-index:15}
+.del-cell:hover .row-actions{opacity:1}
+.row-actions button{background:none;border:none;cursor:pointer;font-size:13px;color:#ff4d4f;padding:2px;line-height:1;border-radius:3px}
+.row-actions button:hover{background:#fff1f0}/* === ADMIN PANEL === */
+.admin-section{background:#fff;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:20px;margin-bottom:16px}
+.admin-section h2{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.member-table{width:100%;border-collapse:collapse;font-size:13px}
+.member-table th,.member-table td{padding:8px 12px;border:1px solid #e8e8e8;text-align:left}
+.member-table th{background:#fafafa;font-weight:600;font-size:12px;color:#555}
+.member-table select{padding:4px 8px;border:1px solid #d9d9d9;border-radius:4px;font-size:12px}
+.invite-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.invite-form input,.invite-form select{padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px}
+.invite-form input:focus,.invite-form select:focus{border-color:#1890ff;outline:none}
+.invite-form button{padding:8px 16px;background:#1890ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
+.invite-form button:hover{background:#40a9ff}
+
+/* === MODAL === */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;justify-content:center;align-items:center}
+.modal-overlay.active{display:flex}
+.modal{background:#fff;border-radius:12px;padding:24px;min-width:420px;max-width:500px;box-shadow:0 8px 32px rgba(0,0,0,.15);margin:20px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:16px;margin-bottom:14px}
+.modal label{display:block;font-size:12px;color:#666;font-weight:500;margin-bottom:3px}
+.modal input,.modal select{width:100%;padding:7px 10px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;margin-bottom:10px;outline:none}
+.modal input:focus,.modal select:focus{border-color:#1890ff;box-shadow:0 0 0 2px rgba(24,144,255,.1)}
+.modal .row{display:flex;gap:10px}
+.modal .row>div{flex:1}
+.modal .cb-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.modal .cb-row input[type=checkbox]{width:auto;accent-color:#eb2f96;width:18px;height:18px;cursor:pointer;margin:0}
+.modal .cb-row label{margin:0;cursor:pointer;font-size:14px;color:#eb2f96;font-weight:600}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.modal-btns button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px}
+.btn-ok{background:#1890ff;color:#fff}
+.btn-ok:hover{background:#40a9ff}
+.btn-cancel{background:#f0f0f0;color:#555}
+.btn-cancel:hover{background:#d9d9d9}
+
+/* === TOAST === */
+.toast{position:fixed;top:16px;right:16px;z-index:2000;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transform:translateY(-10px);transition:all .3s;pointer-events:none;max-width:360px}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast-info{background:#1890ff;color:#fff}
+.toast-success{background:#52c41a;color:#fff}
+.toast-error{background:#ff4d4f;color:#fff}
+
+.file-input-hidden{display:none}
+@media print{.tab-bar,.toolbar,.user-info button,.permission-notice,.ms-bar{display:none}}
+</style>
+</head>
+<body>
+<!-- Loading -->
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <p>加载中...</p>
+</div>
+
+<!-- Login -->
+<div id="loginPage" class="login-page hide">
+  <div class="login-card">
+    <h1>🏗️ OGD 项目协作</h1>
+    <p>使用密码登录（超级管理员）</p>
+    <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email"><input type="password" id="loginPassword" placeholder="密码" style="margin-top:8px">
+    <button id="loginBtn" onclick="loginWithPassword()">登录</button><button class="tb-ghost" id="toggleLoginBtn" onclick="toggleLoginMode()" style="margin-top:4px;width:100%;font-size:12px">使用邮箱链接登录</button>
+    <div id="loginMsg" class="login-msg"></div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="appMain" class="hide">
+  <div class="app-header">
+    <h1>🏗️ OGD 分销拓展项目 <small>团队协作版</small></h1>
+    <div class="user-info">
+      <span id="userName"></span>
+      <span id="userBadge" class="user-badge"></span>
+      <button onclick="showAdminPanel()" id="adminBtn" class="hide">⚙️ 管理</button>
+      <button onclick="logout()">🚪 退出</button>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="active" onclick="switchTab('gantt')">📊 甘特图</button>
+    <button id="adminTabBtn" class="hide" onclick="switchTab('admin')">⚙️ 团队管理</button>
+  </div>
+
+  <div id="tabGantt" class="page-content">
+    <div id="permNotice" class="permission-notice"></div>
+    <div id="msBar" class="ms-bar">
+      <h3>◆ 里程碑 <span id="msCount" style="background:#eb2f96;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;line-height:18px">0</span></h3>
+      <div class="ms-timeline" id="msTimeline"></div>
+    </div>
+    <div class="toolbar">
+      <button class="tb-success" id="addBtn" onclick="addTask()">➕ 新增</button>
+      <button class="tb-ghost" onclick="toggleMsFilter()" id="msFilter">◆ 只看里程碑</button>
+      <div class="tb-sep"></div>
+      <button class="tb-ghost" onclick="refreshData()">🔄 刷新</button>
+      <div class="legend">
+        <span class="legend-item"><span class="lc" style="background:#52c41a"></span>准备</span>
+        <span class="legend-item"><span class="lc" style="background:#faad14"></span>启动</span>
+        <span class="legend-item"><span class="lc" style="background:#1890ff"></span>实施</span>
+        <span class="legend-item"><span class="lc" style="background:#722ed1"></span>回顾</span>
+        <span class="legend-item"><span class="lc" style="background:linear-gradient(135deg,#eb2f96,#722ed1)"></span>◆里程碑</span>
+      </div>
+    </div>
+    <div class="gantt-wrapper">
+      <table class="frozen-cols" id="ganttTable">
+        <thead id="ganttHead"></thead>
+        <tbody id="ganttBody" class=""></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tabAdmin" class="page-content hide">
+    <div id="adminContent"></div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>✏️ 编辑任务</h3>
+    <label>产出</label><input id="eDeliverable">
+    <div class="row"><div><label>内容</label><input id="eContent"></div><div><label>公司</label><select id="eCompany"><option>嘉顿</option><option>ECS</option><option>嘉顿/ECS</option></select></div></div>
+    <label>负责人</label><input id="eResponsible">
+    <div class="row"><div><label>开始日期</label><input id="eStart" type="date"></div><div><label>结束日期</label><input id="eEnd" type="date"></div></div>
+    <label>状态</label><select id="eStatus"><option value="完成">✅ 完成</option><option value="进行中">🔄 进行中</option><option value="">⏳ 待开始</option></select>
+    <div class="cb-row"><input type="checkbox" id="eMilestone"><label for="eMilestone">◆ 标记为里程碑</label></div>
+    <div class="modal-btns"><button class="btn-cancel" onclick="closeModal()">取消</button><button class="btn-ok" onclick="saveEdit()">保存</button></div>
+  </div>
+</div>
+
+<!-- Add Member Modal -->
+<div class="modal-overlay" id="memberModal">
+  <div class="modal">
+    <h3>👤 添加团队成员</h3>
+    <label>邮箱</label><input id="mEmail" type="email" placeholder="colleague@company.com">
+    <div class="row">
+      <div><label>姓名</label><input id="mName" placeholder="显示名称"></div>
+      <div><label>公司</label><select id="mCompany"><option value="ECS">ECS</option><option value="嘉顿">嘉顿</option></select></div>
+    </div>
+    <label>角色</label><select id="mRole"><option value="member">成员</option><option value="admin">公司管理员</option></select>
+    <p style="font-size:12px;color:#999;margin-bottom:10px">添加后系统会向该邮箱发送登录链接</p>
+    <div class="modal-btns"><button class="btn-cancel" onclick="closeMemberModal()">取消</button><button class="btn-ok" onclick="inviteMember()">发送邀请</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// CONFIG —  YOU NEED TO SET THESE
+// ============================================================
+const SUPABASE_URL = 'https://ngvjuufxeiugknnfzfgg.supabase.co';   // ← PASTE YOUR SUPABASE URL HERE
+const SUPABASE_ANON_KEY = 'sb_publishable_FzbUzMQX3Z00aUyj0qik9w_vUI9ntCR'; // ← PASTE YOUR SUPABASE ANON KEY HERE
+
+// ============================================================
+// SUPABASE CLIENT
+// ============================================================
+const { createClient } = supabase;
+const sb = SUPABASE_URL ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+// ============================================================
+// STATE
+// ============================================================
+let currentUser = null;      // { id, email, name, company, role }
+let tasks = [];
+let editIdx = -1;
+let msOnly = false;
+const CELL_W = 34;
+const PHASE_ORDER = ["准备阶段","项目实施","实施阶段","回顾阶段"];
+const PHASE_COLORS = {"准备阶段":"#52c41a","项目实施":"#faad14","实施阶段":"#1890ff","回顾阶段":"#722ed1"};
+
+// ============================================================
+// COLUMN DEFINITIONS (frozen left columns with dynamic widths)
+// ============================================================
+const COL_DEFS = [
+  { id:'phase',       label:'阶段',    width:70,  minW:50  },
+  { id:'content',     label:'内容',    width:100, minW:60  },
+  { id:'deliverable', label:'产出',    width:170, minW:80  },
+  { id:'company',     label:'公司',    width:55,  minW:40  },
+  { id:'responsible', label:'负责',    width:85,  minW:50  },
+  { id:'status',      label:'状态',    width:55,  minW:40  },
+  { id:'milestone',   label:'◆',       width:40,  minW:30  },
+];
+
+function loadColWidths() {
+  try {
+    const s = localStorage.getItem('ogd_col_widths');
+    if (s) { const w = JSON.parse(s); COL_DEFS.forEach(c => { if (w[c.id]) c.width = w[c.id]; }); }
+  } catch(e) {}
+}
+function saveColWidths() {
+  const o = {}; COL_DEFS.forEach(c => o[c.id]=c.width);
+  try { localStorage.setItem('ogd_col_widths', JSON.stringify(o)); } catch(e) {}
+}
+
+function applyColStyles() {
+  let left = 0;
+  COL_DEFS.forEach(c => { c._left = left; left += c.width; });
+
+  let css = '';
+  COL_DEFS.forEach((c, i) => {
+    const w = c.width, l = c._left;
+    // Column widths
+    css += `.col-${c.id}{width:${w}px;min-width:${w}px;max-width:${w}px;}`;
+    // Header: sticky top + sticky left
+    css += `thead .col-${c.id}{position:sticky;top:0;left:${l}px;z-index:31;}`;
+    // Body frozen cells: sticky left via fixed-* class
+    css += `td.fixed-${c.id}{position:sticky;left:${l}px;z-index:10;}`;
+  });
+  // Separator
+  css += 'td.sep-col{border-right:2px solid #91d5ff}th.sep-col{border-right:2px solid #91d5ff}';
+
+  let el = document.getElementById('colDynStyles');
+  if (!el) { el = document.createElement('style'); el.id = 'colDynStyles'; document.head.appendChild(el); }
+  el.textContent = css;
+}
+
+function initResizeHandles() {
+  document.querySelectorAll('.resize-handle').forEach(h => {
+    h.removeEventListener('mousedown', h._rd);
+    h._rd = function(e) {
+      e.preventDefault(); e.stopPropagation();
+      const colId = this.dataset.col;
+      const colIdx = COL_DEFS.findIndex(c=>c.id===colId);
+      if(colIdx<0) return;
+      const col = COL_DEFS[colIdx];
+      const startX = e.clientX, startW = col.width;
+      this.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      function onMove(ev) {
+        const dx = ev.clientX - startX;
+        const newW = Math.max(col.minW, startW + dx);
+        col.width = newW;
+        applyColStyles();
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        h.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        saveColWidths();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    };
+    h.addEventListener('mousedown', h._rd);
+  });
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+/* Password login support */
+let loginMode = 'password';
+
+function toggleLoginMode() {
+  const pw = document.getElementById('loginPassword');
+  const btn = document.getElementById('toggleLoginBtn');
+  const mainBtn = document.getElementById('loginBtn');
+  if (loginMode === 'password') {
+    loginMode = 'magic';
+    pw.classList.add('hide');
+    mainBtn.textContent = '发送登录链接';
+    mainBtn.onclick = sendMagicLink;
+    btn.textContent = '使用密码登录';
+  } else {
+    loginMode = 'password';
+    pw.classList.remove('hide');
+    mainBtn.textContent = '登录';
+    mainBtn.onclick = loginWithPassword;
+    btn.textContent = '使用邮箱链接登录';
+  }
+}
+
+async function loginWithPassword() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!email || !password) return showLoginMsg('请输入邮箱和密码','error');
+  document.getElementById('loginBtn').disabled = true;
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  } catch(e) {
+    showLoginMsg('❌ ' + e.message,'error');
+    document.getElementById('loginBtn').disabled = false;
+  }
+}
+
+async function sendMagicLink() {
+  const email = document.getElementById('loginEmail').value.trim();
+  if (!email) return showLoginMsg('请输入邮箱','error');
+  document.getElementById('loginBtn').disabled = true;
+  document.getElementById('loginBtn').textContent = '发送中...';
+  try {
+    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    if (error) throw error;
+    showLoginMsg('✅ 登录链接已发送，请检查邮箱 (可能需1-2分钟)','success');
+  } catch(e) {
+    showLoginMsg('❌ ' + e.message,'error');
+  }
+  document.getElementById('loginBtn').disabled = false;
+  document.getElementById('loginBtn').textContent = '发送登录链接';
+}
+
+function showLoginMsg(msg, type) {
+  const el = document.getElementById('loginMsg');
+  el.textContent = msg;
+  el.className = 'login-msg ' + (type||'');
+}
+
+async function checkSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    await loadProfile(session.user);
+    return true;
+  }
+  return false;
+}
+
+async function loadProfile(user) {
+  const { data } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  if (data) {
+    currentUser = data;
+    // Update user display
+    document.getElementById('userName').textContent = data.name || data.email;
+    const badge = document.getElementById('userBadge');
+    badge.textContent = data.role === 'super_admin' ? '🛠️ 超级管理员' : (data.role === 'admin' ? `🔧 ${data.company}管理员` : `👤 ${data.company}`);
+    badge.className = 'user-badge badge-' + (data.role === 'super_admin' ? 'super_admin' : data.company);
+    
+    // Show admin button for admins
+    if (data.role === 'super_admin' || data.role === 'admin') {
+      document.getElementById('adminBtn').classList.remove('hide');
+      document.getElementById('adminTabBtn').classList.remove('hide');
+    }
+    
+    showApp();
+    await loadTasks();
+  }
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  currentUser = null;
+  tasks = [];
+  document.getElementById('loginPage').classList.remove('hide');
+  document.getElementById('appMain').classList.add('hide');
+}
+
+// ============================================================
+// APP NAV
+// ============================================================
+function showApp() {
+  document.getElementById('loadingScreen').classList.add('hide');
+  document.getElementById('loginPage').classList.add('hide');
+  document.getElementById('appMain').classList.remove('hide');
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tabGantt').classList.add('hide');
+  document.getElementById('tabAdmin').classList.add('hide');
+  if (tab === 'gantt') {
+    document.querySelector('.tab-bar button:first-child').classList.add('active');
+    document.getElementById('tabGantt').classList.remove('hide');
+  } else {
+    document.getElementById('adminTabBtn').classList.add('active');
+    document.getElementById('tabAdmin').classList.remove('hide');
+    renderAdmin();
+  }
+}
+
+function showAdminPanel() { switchTab('admin'); }
+
+// ============================================================
+// DATA OPERATIONS
+// ============================================================
+async function loadTasks() {
+  const { data } = await sb.from('tasks').select('*').order('id');
+  if (data) tasks = data;
+  renderGantt();
+}
+
+async function refreshData() {
+  await loadTasks();
+  showToast('🔄 已刷新','info');
+}
+
+function canEdit(company) {
+  if (!currentUser) return false;
+  if (currentUser.role === 'super_admin') return true;
+  if (currentUser.role === 'admin' && (currentUser.company === company || company === '嘉顿/ECS')) return true;
+  if (currentUser.role === 'member' && (currentUser.company === company || company === '嘉顿/ECS')) return true;
+  return false;
+}
+
+function canDelete() {
+  return currentUser && (currentUser.role === 'super_admin' || currentUser.role === 'admin');
+}
+
+// ============================================================
+// GANTT RENDER
+// ============================================================
+function renderGantt() {
+  applyColStyles();
+  const data = msOnly ? tasks.filter(t=>t.milestone) : tasks;
+  if (!data.length) {
+    document.getElementById('ganttBody').innerHTML = '<tr><td colspan="20" style="text-align:center;padding:40px;color:#999">暂无任务</td></tr>';
+    renderMsOverview();
+    updatePermNotice();
+    return;
+  }
+  
+  // Timeline
+  let mn=null,mx=null;
+  data.forEach(t=>{
+    if(t.start_date&&(!mn||new Date(t.start_date)<mn)) mn=new Date(t.start_date);
+    if(t.end_date&&(!mx||new Date(t.end_date)>mx)) mx=new Date(t.end_date);
+  });
+  if(!mn) mn=new Date("2026-06-01"); if(!mx) mx=new Date("2026-08-20");
+  mn.setDate(mn.getDate()-3); mx.setDate(mx.getDate()+7);
+  const td = Math.round((mx-mn)/86400000);
+
+  // Month headers
+  let cur = new Date(mn);
+  let mgs=[],cm=null;
+  for(let i=0;i<=td;i++){const m=cur.getMonth();if(m!==cm){cm=m;mgs.push({month:m,year:cur.getFullYear(),startIdx:i,label:`${cur.getFullYear()}/${String(m+1).padStart(2,'0')}`});}cur.setDate(cur.getDate()+1);}
+
+  // === Build header row 1 (months) ===
+  let fc = COL_DEFS.map(c=>`<th class="col-${c.id}">${c.label}<div class="resize-handle" data-col="${c.id}" title="拖拽调整宽度"></div></th>`).join('');
+  let h = `<tr class="date-header">${fc}<th colspan="${td+1}" class="sep-col" style="padding:0;border-left:2px solid #91d5ff"><div style="display:flex">`;
+  mgs.forEach((mg,i)=>{const sp=(i<mgs.length-1?mgs[i+1].startIdx:td+1)-mg.startIdx;h+=`<div style="flex:${sp};text-align:center;padding:4px 0;font-weight:700;color:#1890ff;font-size:12px;border-right:1px solid #e6f0ff">${mg.label}</div>`;});
+  h+=`</div></th></tr>`;
+
+  // === Build header row 2 (days) ===
+  h+=`<tr class="date-header"><th colspan="7" class="sep-col" style="border-right:2px solid #91d5ff"></th>`;
+  cur=new Date(mn);
+  for(let i=0;i<=td;i++){
+    const day=cur.getDay(),we=day===0||day===6;
+    const it=new Date().toDateString()===cur.toDateString();
+    h+=`<th style="${we?'color:#bbb':''}${it?'background:#fff1f0;color:#ff4d4f;font-weight:700':''}width:${CELL_W}px;min-width:${CELL_W}px;padding:3px 0;font-size:10px">${cur.getDate()}</th>`;
+    cur.setDate(cur.getDate()+1);
+  }
+  h+='</tr>';
+  document.getElementById('ganttHead').innerHTML = h;
+
+  // === Body ===
+  const barColors={"准备阶段":"#52c41a","项目实施":"#faad14","实施阶段":"#1890ff","回顾阶段":"#722ed1"};
+  let grp={};
+  data.forEach(t=>{if(!grp[t.phase])grp[t.phase]=[];grp[t.phase].push(t);});
+  let pns=Object.keys(grp).sort((a,b)=>PHASE_ORDER.indexOf(a)-PHASE_ORDER.indexOf(b));
+  let b='';
+  
+  pns.forEach(pn=>{
+    const items=grp[pn], pc=pn.replace('阶段','').trim()||pn;
+    const pClass=pn==='准备阶段'?'prep':(pn==='项目实施'?'launch':(pn==='实施阶段'?'exec':'review'));
+    items.forEach((t,i)=>{
+      const isMs=t.milestone, sc=t.status||'';
+      const s=t.start_date?new Date(t.start_date):null, e=t.end_date?new Date(t.end_date):null;
+      const bc=isMs?'linear-gradient(135deg,#eb2f96,#722ed1)':(sc==='完成'?'#52c41a':(sc==='进行中'?'#faad14':(barColors[t.phase]||'#bfbfbf')));
+      const canE=canEdit(t.company);
+      const showDel = canDelete();
+      
+      b+=`<tr class="phase-${pClass}${isMs?' phase-milestone':''}">`;
+      if(i===0) b+=`<td class="phase-label col-phase fixed-phase" rowspan="${items.length}">${pn.replace('阶段','')}</td>`;
+      b+=`<td class="cell col-content fixed-content" ${canE?`ondblclick="editTask(${t.id})"`:""} title="${canE?"双击编辑":""}">${t.content}</td>`;
+      b+=`<td class="del-cell col-deliverable fixed-deliverable" ${canE?`ondblclick="editTask(${t.id})"`:''} title="${canE?'双击编辑':''}">${isMs?'◆ ':''}${t.deliverable}${showDel?`<div class="row-actions"><button onclick="deleteTask(${t.id})" title="删除">🗑️</button></div>`:''}</td>`;
+      b+=`<td class="cell col-company fixed-company" ${canE?`ondblclick="editTask(${t.id})"`:""} title="${canE?"双击编辑":""}" style="text-align:center">${t.company||""}</td>`;
+      b+=`<td class="cell col-responsible fixed-responsible" ${canE?`ondblclick="editTask(${t.id})"`:""} title="${canE?"双击编辑":""}" style="text-align:center">${t.responsible||""}</td>`;
+      b+=`<td class="col-status-data fixed-status" ${canE?`ondblclick="editTask(${t.id})"`:""} title="${canE?"双击编辑":""}"><span class="status-badge status-${sc==="完成"?"done":(sc==="进行中"?"progress":"pending")}">${sc||"待开始"}</span></td>`;
+      b+=`<td class="ms-check fixed-milestone" ${canE?`onclick="toggleMs(${t.id})"`:''} title="${canE?'点击切换里程碑':''}">${isMs?'◆':'◇'}</td>`;
+
+      // Gantt chart cell
+      b+=`<td class="sep-col" colspan="${td+1}" style="padding:0;border-left:2px solid #91d5ff;position:relative;height:32px"><div class="gantt-cell">`;
+      
+      // Today line
+      const to=Math.round((new Date()-mn)/86400000);
+      if(to>=0&&to<=td) b+=`<div class="today-line" style="left:${to*CELL_W+CELL_W/2}px"><span class="today-label">今天</span></div>`;
+
+      if(s&&e){
+        const so=Math.round((s-mn)/86400000), eo=Math.round((e-mn)/86400000);
+        const bw=Math.max((eo-so+1)*CELL_W-4,8), bl=so*CELL_W+2, lbl=t.deliverable.length>6?t.deliverable.slice(0,6)+'..':t.deliverable;
+        b+=`<div class="task-bar ${isMs?'bar-milestone':'bar-'+(sc==='完成'?'ready':(sc==='进行中'?'active':'wait'))}" style="left:${bl}px;width:${bw}px;background:${bc}" ${canE?`ondblclick="editTask(${t.id})"`:''} title="${isMs?'◆里程碑: ':''}${t.deliverable}
+${t.start_date||'?'}→${t.end_date||'?'}
+${t.responsible?'负责人:'+t.responsible:''}
+状态:${sc||'待开始'}">${bw>50?lbl:''}</div>`;
+      } else if(!s&&e){
+        const eo=Math.round((e-mn)/86400000);
+        b+=`<div class="task-bar" style="left:${eo*CELL_W+12}px;width:12px;background:#bbb" title="${t.deliverable}
+截止:${t.end_date}"></div>`;
+      } else if(!s&&!e&&(t.phase==="实施阶段"||t.phase==="回顾阶段")){
+        const ro=Math.round((new Date("2026-07-10")-mn)/86400000), re=td;
+        const bw=Math.max((re-ro+1)*CELL_W-4,8), bl=ro*CELL_W+2;
+        b+=`<div class="task-bar" style="left:${bl}px;width:${bw}px;background:${bc};opacity:.4;border:1px dashed ${bc}" title="${t.deliverable}
+（持续进行中）"></div>`;
+      }
+      b+='</div></td></tr>';
+    });
+  });
+  document.getElementById('ganttBody').innerHTML = b;
+  renderMsOverview();
+  updatePermNotice();
+  // Re-bind resize handles after DOM update
+  setTimeout(initResizeHandles, 0);
+}
+
+function renderMsOverview() {
+  const ms = tasks.filter(t=>t.milestone);
+  document.getElementById('msCount').textContent = ms.length;
+  ms.sort((a,b)=>(a.end_date||a.start_date||'')>(b.end_date||b.start_date||'')?1:-1);
+  let html='';
+  ms.forEach((t,i)=>{
+    const done=t.status==='完成', d=t.end_date||t.start_date||'';
+    const ds=d?new Date(d).getMonth()+1+'/'+new Date(d).getDate():'';
+    html+=`<div class="ms-item" onclick="scrollToTask('${t.deliverable.replace(/'/g,"\\'")}')" title="点击跳转">
+      <div class="ms-diamond" style="color:${done?'#52c41a':'#eb2f96'}">${done?'✅':'◆'}</div>
+      <div class="ms-date">${ds}</div>
+      <div class="ms-label">${t.deliverable.length>7?t.deliverable.slice(0,7)+'…':t.deliverable}</div>
+      <div class="ms-phase">${t.phase}</div></div>`;
+  });
+  document.getElementById('msTimeline').innerHTML = html||'<span style="color:#999;font-size:13px">暂无里程碑</span>';
+}
+
+function scrollToTask(del) {
+  document.querySelectorAll('.del-cell').forEach(c=>{
+    if(c.textContent.trim().replace(/◆\s*/,'')===del){
+      c.closest('tr').scrollIntoView({behavior:'smooth',block:'center'});
+      c.style.background='#fff0f6';setTimeout(()=>c.style.background='',2000);
+    }
+  });
+}
+
+function toggleMsFilter(){msOnly=!msOnly;document.getElementById('msFilter').textContent=msOnly?'◆ 显示全部':'◆ 只看里程碑';renderGantt();}
+
+// ============================================================
+// TASK CRUD
+// ============================================================
+async function addTask() {
+  if (!currentUser) return showToast('⛔ 请先登录','error');
+  if (!canEdit('嘉顿')&&!canEdit('ECS')) return showToast('⛔ 你没有权限添加任务','error');
+  try {
+    const company = currentUser.company || 'ECS';
+    const { data, error } = await sb.from('tasks').insert({
+      phase:'准备阶段', content:'新任务', deliverable:'双击编辑', company:company,
+      responsible:'', status:'', milestone:false
+    }).select().single();
+    if(error) return showToast('❌ 添加失败: '+error.message,'error');
+    if(!data) return showToast('❌ 添加失败: 未返回数据','error');
+    tasks.push(data);
+    renderGantt();
+    setTimeout(()=>{
+      const wrapper=document.querySelector('.gantt-wrapper');
+      if(wrapper) wrapper.scrollTop=wrapper.scrollHeight;
+    },100);
+    showToast('➕ 已添加，双击编辑','success');
+  } catch(e) {
+    showToast('❌ 添加失败: '+e.message,'error');
+  }
+}
+
+async function deleteTask(id) {
+  if(!canDelete()) return showToast('⛔ 只有管理员可以删除','error');
+  const t=tasks.find(t=>t.id===id);
+  if(!confirm(`删除「${t?t.deliverable:''}」？`)) return;
+  const { error } = await sb.from('tasks').delete().eq('id',id);
+  if(error) return showToast('❌ 删除失败','error');
+  tasks=tasks.filter(t=>t.id!==id);
+  renderGantt();
+  showToast('🗑️ 已删除','info');
+}
+
+async function toggleMs(id) {
+  const t=tasks.find(t=>t.id===id);
+  if(!t||!canEdit(t.company)) return showToast('⛔ 你没有权限','error');
+  const { error } = await sb.from('tasks').update({milestone:!t.milestone}).eq('id',id);
+  if(!error){t.milestone=!t.milestone;renderGantt();showToast(t.milestone?'◆ 标记里程碑':'◇ 取消里程碑','info');}
+}
+
+function editTask(id) {
+  const t=tasks.find(t=>t.id===id);
+  if(!t) return;
+  if(!canEdit(t.company)) return showToast('⛔ 你只能编辑自己公司的任务','error');
+  editIdx = id;
+  document.getElementById('eDeliverable').value=t.deliverable;
+  document.getElementById('eContent').value=t.content;
+  document.getElementById('eCompany').value=t.company||'嘉顿';
+  document.getElementById('eResponsible').value=t.responsible||'';
+  document.getElementById('eStart').value=t.start_date||'';
+  document.getElementById('eEnd').value=t.end_date||'';
+  document.getElementById('eStatus').value=t.status||'';
+  document.getElementById('eMilestone').checked=!!t.milestone;
+  document.getElementById('editModal').classList.add('active');
+}
+
+async function saveEdit() {
+  if(editIdx<0) return;
+  const updates={
+    deliverable:document.getElementById('eDeliverable').value,
+    content:document.getElementById('eContent').value,
+    company:document.getElementById('eCompany').value,
+    responsible:document.getElementById('eResponsible').value,
+    start_date:document.getElementById('eStart').value||null,
+    end_date:document.getElementById('eEnd').value||null,
+    status:document.getElementById('eStatus').value,
+    milestone:document.getElementById('eMilestone').checked
+  };
+  const { error } = await sb.from('tasks').update(updates).eq('id',editIdx);
+  if(error) return showToast('❌ 保存失败: '+error.message,'error');
+  const t=tasks.find(t=>t.id===editIdx);
+  if(t) Object.assign(t,updates);
+  closeModal();
+  renderGantt();
+  showToast('✅ 已保存','success');
+}
+
+function closeModal() { document.getElementById('editModal').classList.remove('active'); editIdx=-1; }
+
+// ============================================================
+// ADMIN PANEL
+// ============================================================
+async function renderAdmin() {
+  const isSuper = currentUser.role === 'super_admin';
+  const isAdmin = currentUser.role === 'admin';
+  const { data: members } = await sb.from('profiles').select('*').order('created_at');
+  
+  let html = '';
+  
+  // Invite form (company admins can invite to their company, super admin can pick)
+  html += `<div class="admin-section"><h2>📧 邀请团队成员</h2>
+    <div class="invite-form">
+      <input type="email" id="inviteEmail" placeholder="邮箱" style="width:200px">
+      <input type="text" id="inviteName" placeholder="姓名" style="width:140px">
+      <select id="inviteCompany" ${isSuper?'':'disabled'}>
+        <option value="${currentUser.company}">${currentUser.company}</option>
+        ${isSuper?'<option value="ECS">ECS</option><option value="嘉顿">嘉顿</option>':''}
+      </select>
+      <select id="inviteRole"><option value="member">成员</option><option value="admin">公司管理员</option></select>
+      <button onclick="inviteMember()">📩 发送邀请</button>
+    </div>
+  </div>`;
+
+  // Members table
+  html += `<div class="admin-section"><h2>👥 团队成员</h2>
+    <table class="member-table">
+      <tr><th>邮箱</th><th>姓名</th><th>公司</th><th>角色</th><th>操作</th></tr>`;
+  
+  if(members) members.forEach(m => {
+    const canManage = isSuper || (isAdmin && m.company === currentUser.company);
+    html += `<tr>
+      <td>${m.email||'—'}</td>
+      <td>${m.name||'—'}</td>
+      <td><span class="user-badge badge-${m.company}">${m.company||'—'}</span></td>
+      <td><span class="user-badge badge-${m.role==='super_admin'?'super_admin':(m.role==='admin'?'admin':'')}">${m.role==='super_admin'?'超级管理员':(m.role==='admin'?'管理员':'成员')}</span></td>
+      <td>${canManage&&m.role!=='super_admin'?`<select onchange="changeRole('${m.id}',this.value)"><option value="member" ${m.role==='member'?'selected':''}>成员</option><option value="admin" ${m.role==='admin'?'selected':''}>管理员</option></select>`:'—'}</td>
+    </tr>`;
+  });
+  html += '</table></div>';
+
+  // Activity log for super admin
+  if (isSuper) {
+    const { data: logs } = await sb.from('activity_log').select('*').order('created_at',{ascending:false}).limit(20);
+    html += `<div class="admin-section"><h2>📋 最近操作日志</h2>`;
+    if (logs && logs.length) {
+      html += `<table class="member-table"><tr><th>时间</th><th>用户</th><th>操作</th></tr>`;
+      logs.forEach(l => html+=`<tr><td>${new Date(l.created_at).toLocaleString('zh-CN')}</td><td>${l.user_name||''}</td><td>${l.detail||l.action||''}</td></tr>`);
+      html += `</table>`;
+    } else html += `<p style="color:#999;font-size:13px">暂无操作记录</p>`;
+    html += `</div>`;
+  }
+
+  document.getElementById('adminContent').innerHTML = html;
+  
+  // Pre-fill company for non-super admins
+  if (!isSuper) document.getElementById('inviteCompany').value = currentUser.company;
+}
+
+async function inviteMember() {
+  const email = document.getElementById('inviteEmail').value.trim();
+  const name = document.getElementById('inviteName').value.trim();
+  const company = document.getElementById('inviteCompany').value;
+  const role = document.getElementById('inviteRole').value;
+  if (!email) return showToast('请输入邮箱','error');
+  
+  try {
+    const { error } = await sb.auth.admin.inviteUserByEmail(email, {
+      data: { name, company, role }
+    });
+    if (error) throw error;
+    showToast(`📩 邀请已发送给 ${email}`,'success');
+    document.getElementById('inviteEmail').value='';
+    document.getElementById('inviteName').value='';
+  } catch(e) {
+    showToast('❌ 邀请失败: '+e.message,'error');
+  }
+}
+
+function closeMemberModal() { document.getElementById('memberModal').classList.remove('active'); }
+
+async function changeRole(userId, newRole) {
+  const { error } = await sb.from('profiles').update({role:newRole}).eq('id',userId);
+  if(error) showToast('❌ 更新失败','error');
+  else { showToast('✅ 角色已更新','success'); renderAdmin(); }
+}
+
+// ============================================================
+// PERMISSION NOTICE
+// ============================================================
+function updatePermNotice() {
+  const el = document.getElementById('permNotice');
+  if (!currentUser) return;
+  let msg = '';
+  if (currentUser.role === 'super_admin') msg = '🛠️ 你拥有全部管理权限';
+  else if (currentUser.role === 'admin') msg = `🔧 你是 ${currentUser.company} 管理员，可管理本团队成员和编辑任务`;
+  else msg = `👤 你是 ${currentUser.company} 团队成员，可编辑本公司任务`;
+  el.innerHTML = `<span class="p-badge badge-${currentUser.company||'admin'}">${currentUser.company||'admin'}</span> ${msg}`;
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.className='toast toast-'+(type||'info')+' show';
+  clearTimeout(t._timer); t._timer=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ============================================================
+// KEYBOARD
+// ============================================================
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeModal();closeMemberModal();}
+  if(e.key==='Enter'&&document.getElementById('editModal').classList.contains('active')) saveEdit();
+});
+
+document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('memberModal').addEventListener('click',function(e){if(e.target===this)closeMemberModal();});
+document.getElementById('loginEmail').addEventListener('keydown',function(e){if(e.key==='Enter'){if(document.getElementById('loginPassword').value){loginWithPassword()}else{sendMagicLink()}}});
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  loadColWidths();
+  const loading = document.getElementById('loadingScreen');
+  
+  // Check Supabase config
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    loading.innerHTML = `
+      <div style="background:#fff;padding:30px;border-radius:12px;max-width:500px;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+        <h2 style="margin-bottom:16px">⚙️ 首次配置</h2>
+        <p style="margin-bottom:16px;color:#555;line-height:1.6">
+          这个应用需要连接 Supabase 数据库。请在 <strong>index.html</strong> 文件中设置：
+        </p>
+        <ol style="text-align:left;color:#555;line-height:2;padding-left:20px;margin-bottom:16px">
+          <li>打开 <strong>ogd-gantt-web/index.html</strong></li>
+          <li>找到开头的 <code>SUPABASE_URL</code> 和 <code>SUPABASE_ANON_KEY</code></li>
+          <li>填入你 Supabase 项目的对应值</li>
+        </ol>
+        <p style="color:#888;font-size:13px">完成后刷新页面即可。</p>
+        <p style="margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;color:#999;font-size:12px">
+          还没有 Supabase 项目？请按 README.md 指引创建。
+        </p>
+      </div>`;
+    return;
+  }
+  
+  // Listen for auth state changes
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      loadProfile(session.user);
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      document.getElementById('loginPage').classList.remove('hide');
+      document.getElementById('appMain').classList.add('hide');
+    }
+  });
+  
+  // Check existing session
+  const hasSession = await checkSession();
+  if (!hasSession) {
+    loading.classList.add('hide');
+    document.getElementById('loginPage').classList.remove('hide');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
