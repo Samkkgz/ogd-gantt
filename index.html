@@ -404,7 +404,7 @@ function applyColStyles() {
     // Header: sticky top + sticky left
     css += `thead .col-${c.id}{position:sticky;top:0;left:${l}px;z-index:31;}`;
     // Body frozen cells: sticky left via fixed-* class
-    css += `td.fixed-${c.id}{position:sticky;left:${l}px;z-index:10;}`;
+    css += `td.fixed-${c.id}{position:sticky;left:${l}px;z-index:10;background:#fff}`;
   });
   // Separator
   css += 'td.sep-col{border-right:2px solid #91d5ff}th.sep-col{border-right:2px solid #91d5ff}';
@@ -882,7 +882,7 @@ function renderGantt() {
   h+=`</div></th></tr>`;
 
   // === Build header row 2 (days) ===
-  h+=`<tr class="date-header"><th colspan="7" class="sep-col" style="border-right:2px solid #91d5ff"></th>`;
+  h+=`<tr class="date-header"><th colspan="7" class="sep-col" style="position:sticky;left:0;z-index:29;background:#fafafa;border-right:2px solid #91d5ff"></th>`;
   cur=new Date(mn);
   for(let i=0;i<=td;i++){
     const day=cur.getDay(),we=day===0||day===6;
