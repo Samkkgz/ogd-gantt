@@ -1069,7 +1069,20 @@ function closeModal() { document.getElementById('editModal').classList.remove('a
 async function renderAdmin() {
   const isSuper = currentUser.role === 'super_admin';
   const isAdmin = currentUser.role === 'admin';
-  const { data: members } = await sb.from('profiles').select('*').order('created_at');
+  // Load members: if super_admin, show all; otherwise show only current project members
+  let members = [];
+  if (isSuper) {
+    const { data: allMembers } = await sb.from('profiles').select('*').order('created_at');
+    members = allMembers || [];
+  } else if (currentProject) {
+    // Get project member IDs first
+    const { data: pmData } = await sb.from('project_members').select('user_id').eq('project_id', currentProject.id);
+    if (pmData && pmData.length) {
+      const userIds = pmData.map(pm => pm.user_id);
+      const { data: projectMembers } = await sb.from('profiles').select('*').in('id', userIds).order('created_at');
+      members = projectMembers || [];
+    }
+  }
   
   let html = '';
   
