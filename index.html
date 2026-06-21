@@ -759,8 +759,8 @@ async function activateProject(projectId) {
 
 async function deleteProject(projectId) {
   const p = projects.find(x => x.id === projectId);
-  if (!p || !confirm('⚠️ 确定要永久删除项目 "' + p.name + '" 吗？
-此操作不可撤销！所有关联任务、文件、日志将被清空。')) return;
+  if (!p || !confirm(`⚠️ 确定要永久删除项目 "${p.name}" 吗？
+此操作不可撤销！所有关联任务、文件、日志将被清空。`)) return;
   if (!confirm('再次确认：项目 "' + p.name + '" 将被永久删除！')) return;
   try {
     const { error } = await sb.from('projects').delete().eq('id', projectId);
