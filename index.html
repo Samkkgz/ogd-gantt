@@ -137,6 +137,7 @@ tr:hover td.phase-label,tr:hover td.cell,tr:hover td.del-cell,tr:hover td.ms-cel
 .del-cell{cursor:default;padding:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative}
 .del-cell:hover{background:#f0f0f0!important}
 .ms-cell{text-align:center;padding:4px;cursor:pointer;font-size:15px;line-height:1}
+.ms-check{text-align:center}
 .col-status-data{text-align:center;padding:5px}
 
 /* Status badges */
@@ -400,7 +401,7 @@ function applyColStyles() {
   COL_DEFS.forEach((c, i) => {
     const w = c.width, l = c._left;
     // Column widths
-    css += `.col-${c.id}{width:${w}px;min-width:${w}px;max-width:${w}px;}`;
+    css += `.col-${c.id}{width:${w}px;min-width:${w}px;max-width:${w}px;text-align:${c.id==='milestone'?'center':'left'}}`;
     // Header: sticky top + sticky left
     css += `#ganttTable .col-${c.id}{position:sticky;top:0;left:${l}px;z-index:31;}`;
     // Body frozen cells: sticky left via fixed-* class
