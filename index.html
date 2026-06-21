@@ -1154,7 +1154,9 @@ async function renderAdmin() {
 
   // Activity log for super admin
   if (isSuper) {
-    const { data: logs } = await sb.from('activity_log').select('*').order('created_at',{ascending:false}).limit(20);
+    let logQuery = sb.from('activity_log').select('*').order('created_at',{ascending:false});
+    if (currentProject) logQuery = logQuery.eq('project_id', currentProject.id);
+    const { data: logs } = await logQuery.limit(20);
     html += `<div class="admin-section"><h2>📋 最近操作日志</h2>`;
     if (logs && logs.length) {
       html += `<table class="member-table"><tr><th>时间</th><th>用户</th><th>操作</th></tr>`;
