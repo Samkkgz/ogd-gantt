@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>项目管理系统 v2.0.0</title>
+<meta name="description" content="项目管理系统 - 多项目管理平台">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -1069,12 +1071,9 @@ function closeModal() { document.getElementById('editModal').classList.remove('a
 async function renderAdmin() {
   const isSuper = currentUser.role === 'super_admin';
   const isAdmin = currentUser.role === 'admin';
-  // Load members: if super_admin, show all; otherwise show only current project members
+  // Load members for the current project only
   let members = [];
-  if (isSuper) {
-    const { data: allMembers } = await sb.from('profiles').select('*').order('created_at');
-    members = allMembers || [];
-  } else if (currentProject) {
+  if (currentProject) {
     // Get project member IDs first
     const { data: pmData } = await sb.from('project_members').select('user_id').eq('project_id', currentProject.id);
     if (pmData && pmData.length) {
