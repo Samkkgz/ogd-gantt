@@ -115,8 +115,7 @@ tr.phase-review td{background:#f9f0ff}
 tr.phase-milestone td{background:#fff0f6}
 
 /* === FROZEN CELL BACKGROUNDS — explicit for position:sticky to render === */
-.phase-label{font-weight:700;font-size:13px;padding:8px 4px;min-height:60px}
-.pl-wrap{writing-mode:vertical-lr;letter-spacing:4px;display:flex;align-items:center;justify-content:center;height:100%;width:100%}
+.phase-label{font-weight:700;writing-mode:vertical-lr;letter-spacing:4px;font-size:13px;text-align:center;padding:8px 4px;min-height:60px}
 tr.phase-prep td.phase-label{background:#d9f7be;color:#237804}
 tr.phase-launch td.phase-label{background:#ffe58f;color:#ad6800}
 tr.phase-exec td.phase-label{background:#91d5ff;color:#003a8c}
@@ -913,7 +912,7 @@ function renderGantt() {
       const showDel = canDelete();
       
       b+=`<tr class="phase-${pClass}${isMs?' phase-milestone':''}">`;
-      if(i===0) b+=`<td class="phase-label col-phase fixed-phase" rowspan="${items.length}"><div class="pl-wrap">${pn.replace('阶段','')}</div></td>`;
+      if(i===0) b+=`<td class="phase-label col-phase fixed-phase" rowspan="${items.length}">${pn.replace('阶段','')}</td>`;
       b+=`<td class="cell col-content fixed-content" ${canE?`ondblclick="editTask(${t.id})"`:""} title="${canE?"双击编辑":""}">${t.content}</td>`;
       b+=`<td class="del-cell col-deliverable fixed-deliverable" ${canE?`ondblclick="editTask(${t.id})"`:''} title="${canE?'双击编辑':''}">${isMs?'◆ ':''}${t.deliverable}${showDel?`<div class="row-actions"><button onclick="deleteTask(${t.id})" title="删除">🗑️</button></div>`:''}</td>`;
       b+=`<td class="cell col-company fixed-company" ${canE?`ondblclick="editTask(${t.id})"`:""} title="${canE?"双击编辑":""}" style="text-align:center">${t.company||""}</td>`;
