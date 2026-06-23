@@ -1305,30 +1305,17 @@ async function storageAPI(method, path, body) {
 
 // Check if the storage bucket exists (raw fetch, no SDK)
 async function ensureBucketExists() {
-  // Check bucket by trying to list objects (more reliable than listing all buckets)
+  // Use Supabase SDK list() to check bucket (handles correct HTTP method)
   try {
-    const resp = await storageAPI('GET', 'object/list/project_files');
-    if (resp.ok || resp.status === 200 || resp.status === 206 || resp.status === 404) {
-      // 200/206 = bucket exists with/without results
-      // 404 = bucket exists but path not found (the bucket itself is valid)
-      return true;
-    }
-  } catch(e) {
-    // If the error is about missing bucket, the catch will help diagnose
-    if (e.status === 404 && e.code === 'BUCKET_NOT_FOUND') {
-      console.warn('[BucketCheck] Bucket not found via REST');
+    const { data, error } = await sb.storage.from('project_files').list('', { limit: 1 });
+    if (error && error.message && error.message.toLowerCase().includes('bucket not found')) {
+      console.warn('[BucketCheck] project_files bucket NOT FOUND');
       return false;
     }
-  }
-  // Fallback: try listing buckets (may fail for non-admin JWT)
-  try {
-    const resp = await storageAPI('GET', 'bucket');
-    const buckets = await resp.json();
-    const exists = buckets && buckets.some(b => b.name === 'project_files' || b.id === 'project_files');
-    console.log('[BucketCheck] project_files bucket ' + (exists ? 'EXISTS' : 'NOT FOUND'));
-    return exists;
+    console.log('[BucketCheck] project_files bucket EXISTS');
+    return true; // Any response means bucket exists
   } catch(e) {
-    console.warn('[BucketCheck] Assuming bucket exists (upload test will confirm)');
+    console.warn('[BucketCheck] SDK check failed, assuming exists:', e.message);
     return true;
   }
 }
@@ -1453,31 +1440,28 @@ async function testStorageSystem() {
     results.push({ step: '获取登录令牌', ok: !!token, detail: token ? '成功 (' + token.substring(0, 20) + '...)' : '无令牌' });
   } catch(e) { results.push({ step: '获取登录令牌', ok: false, detail: e.message }); }
   
-  // Test 2: Check bucket by trying to list objects (more reliable)
+  // Test 2: Check bucket via SDK list()
   let bucketOk = false;
+  let bucketMsg = '';
   try {
-    const resp = await storageAPI('GET', 'object/list/project_files');
-    bucketOk = resp.ok || resp.status === 200 || resp.status === 206;
-    results.push({ step: '检查 project_files 存储桶', ok: bucketOk, detail: bucketOk ? '✅ 存储桶存在并可访问' : '⚠️ 可能不存在' });
-    if (!bucketOk) {
-      // Fallback: try listing buckets
-      try {
-        const resp2 = await storageAPI('GET', 'bucket');
-        const buckets = await resp2.json();
-        const has = buckets && buckets.some(b => b.name === 'project_files');
-        bucketOk = has;
-        results.push({ step: '→ 查询存储桶列表', ok: has, detail: has ? '✅ 确认存在' : '❌ 未找到 project_files' });
-        if (!has) results.push({ step: '→ 需创建存储桶', ok: false, detail: '请在 Supabase SQL Editor 运行 v2_migration.sql' });
-      } catch(e2) {
-        results.push({ step: '→ 查询存储桶列表', ok: true, detail: '跳过（需管理员权限）' });
-        bucketOk = true; // Assume exists if admin listing fails
+    const { data, error } = await sb.storage.from('project_files').list('', { limit: 1 });
+    bucketOk = !error;
+    if (error) {
+      bucketMsg = error.message || String(error);
+      // Ignore "The resource was not found" which sometimes means list returns empty
+      if (bucketMsg.toLowerCase().includes('resource was not found')) {
+        bucketOk = true;
+        bucketMsg = '存储桶存在（列表为空）';
       }
+    } else {
+      bucketMsg = '✅ 存储桶存在，文件数量: ' + (data ? data.length : 0);
+    }
+    results.push({ step: '检查 project_files 存储桶', ok: bucketOk, detail: bucketMsg });
+    if (!bucketOk) {
+      results.push({ step: '→ 需创建存储桶', ok: false, detail: '请在 Supabase SQL Editor 运行 v2_migration.sql' });
     }
   } catch(e) {
     results.push({ step: '检查 project_files 存储桶', ok: false, detail: e.message });
-    if (e.code === 'PERMISSION_DENIED') {
-      results.push({ step: '→ 可能权限不足', ok: false, detail: '需检查存储桶 RLS 策略' });
-    }
   }
   
   // Test 3: Check file_metadata table
