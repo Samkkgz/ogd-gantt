@@ -99,3 +99,15 @@ ogd-gantt-web/
 - Supabase 免费套餐包含 50000 条记录/月，完全够用
 - 邮箱登录链接有效期 1 小时，过期需重新发送
 - 所有数据存储在 Supabase 云端，换设备登录数据依然在
+
+## 🔐 安全
+
+- 安全策略、漏洞报告方式与部署基线见 [SECURITY.md](SECURITY.md)。
+- 前端使用的 Supabase `anon` / `publishable` key 是公开信息，真正的权限边界是数据库 RLS；禁止把 `service_role` key 写入前端。
+- 生产部署前请确认所有业务表已启用 RLS、`project_files` 存储桶为 private，并且 GitHub Pages 不发布 `*.sql` 与种子数据。
+
+## 📄 License
+
+本项目采用 [MIT License](LICENSE)。
+
+Copyright (c) 2026 Sam Lu (Samkkgz)
